@@ -9,6 +9,7 @@ import type { TrackingHealth } from './tracking-health'
 import { getAppIcon } from './app-icons'
 import { validateDate } from './validation'
 import { buildPeriodReport } from '../shared/report'
+import { WEEKLY_GOAL_HOURS } from '../shared/goal'
 import { mergeMeetings, meetingSeconds } from '../shared/meetings'
 import { IPC_CHANNELS, type Category, type CategoryRule, type TagTargetType, type TagType } from '../shared/types'
 
@@ -180,8 +181,10 @@ export function registerIpcHandlers(
 
     const workByDay = db.getWorkByDay(from, to)
     const meetings = mergeMeetings(db.getMeetingsByRange(from, to))
-    const goalMinutes = db.getSetting('dailyWorkGoal')
-    const goalSecondsPerDay = (goalMinutes ? parseInt(goalMinutes) || 0 : 0) * 60
+    const weekGoalMinutes = db.getSetting('weeklyWorkGoal')
+    const weekGoalSeconds = (weekGoalMinutes ? parseInt(weekGoalMinutes) || 0 : WEEKLY_GOAL_HOURS * 60) * 60
+    const dayGoalMinutes = db.getSetting('dailyWorkGoal')
+    const dayGoalSeconds = (dayGoalMinutes ? parseInt(dayGoalMinutes) || 0 : 0) * 60
 
     const text = buildPeriodReport({
       from,
@@ -190,7 +193,8 @@ export function registerIpcHandlers(
       workSeconds: workByDay.reduce((sum, day) => sum + day.seconds, 0),
       meetingSeconds: meetings.reduce((sum, meeting) => sum + meetingSeconds(meeting), 0),
       afkSeconds,
-      goalSecondsPerDay,
+      weekGoalSeconds,
+      dayGoalSeconds,
       workByDay,
       topApps: db.getTopApps(from, to, 5).map((app) => ({
         appName: app.appName,
@@ -402,6 +406,7 @@ const ALLOWED_SETTING_KEYS = new Set([
   'dailyWorkGoal',
   'locationLat',
   'locationLon',
+  'weeklyWorkGoal',
 ])
 
 function assertSettingKey(key: string): void {

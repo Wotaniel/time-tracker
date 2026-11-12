@@ -169,6 +169,24 @@ function collect(db, date) {
     `)
     .all({ start: start.toISOString(), end: end.toISOString() })
 
+  const goalRow = db
+    .prepare("SELECT value FROM settings WHERE key = 'weeklyWorkGoal'")
+    .get()
+  const weekGoalMinutes = goalRow ? parseInt(goalRow.value) || 0 : 2400
+  const weekGoalSeconds = weekGoalMinutes * 60
+
+  // Работа — тег work у приложения или у домена (как в интерфейсе)
+  const tags = db.prepare('SELECT target_type, target_key, tag FROM app_tags').all()
+  const workApps = new Set(tags.filter((t) => t.target_type === 'app' && t.tag === 'work').map((t) => t.target_key))
+  const workDomains = new Set(tags.filter((t) => t.target_type === 'domain' && t.tag === 'work').map((t) => t.target_key))
+
+  const workSeconds = apps
+    .filter((a) => workApps.has(a.app))
+    .reduce((sum, a) => sum + a.seconds, 0) +
+    webRows
+      .filter((r) => workDomains.has(domainOf(r.url)))
+      .reduce((sum, r) => sum + r.seconds, 0)
+
   const domains = new Map()
   for (const row of webRows) {
     const domain = domainOf(row.url)
@@ -178,6 +196,8 @@ function collect(db, date) {
 
   return {
     date,
+    weekGoalSeconds,
+    workSeconds: Math.round(workSeconds),
     active: Math.round(coverage.active),
     afk: Math.round(coverage.afk),
     uncovered: Math.max(0, Math.round(spanRow.span) - Math.round(coverage.active) - Math.round(coverage.afk)),
@@ -222,6 +242,22 @@ function toMarkdown(report) {
     )} · AFK ${fmt(report.afk)} · не записано ${fmt(report.uncovered)}`
   )
   lines.push('')
+
+  if (report.weekGoalSeconds > 0) {
+    const percent = Math.round((report.workSeconds / report.weekGoalSeconds) * 100)
+    const tiers = [
+      ['золото', report.weekGoalSeconds],
+      ['серебро', report.weekGoalSeconds - 5 * 3600],
+      ['бронза', report.weekGoalSeconds - 10 * 3600]
+    ]
+    const tier = tiers.find(([, seconds]) => report.workSeconds >= seconds)
+    lines.push(
+      `Цель недели ${fmt(report.weekGoalSeconds)}: работа ${fmt(report.workSeconds)} (${percent}%)${
+        tier ? `, уровень: ${tier[0]}` : ''
+      }`
+    )
+    lines.push('')
+  }
 
   if (report.tasks.length > 0) {
     lines.push('**Задачи (Jira):**')

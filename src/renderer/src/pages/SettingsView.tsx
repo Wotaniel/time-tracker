@@ -6,6 +6,7 @@ export default function SettingsView(): JSX.Element {
   const [autostart, setAutostart] = useState(false)
   const [idleThreshold, setIdleThreshold] = useState(600)
   const [workGoalHours, setWorkGoalHours] = useState(0)
+  const [weekGoalHours, setWeekGoalHours] = useState(40)
   const [lat, setLat] = useState('')
   const [lon, setLon] = useState('')
   const [excludedApps, setExcludedApps] = useState<string[]>([])
@@ -19,13 +20,17 @@ export default function SettingsView(): JSX.Element {
       window.api.settings.get('idleThreshold'),
       window.api.settings.get('excludedApps'),
       window.api.settings.get('dailyWorkGoal'),
+      window.api.settings.get('weeklyWorkGoal'),
       window.api.settings.get('locationLat'),
       window.api.settings.get('locationLon')
-    ]).then(([auto, idle, excluded, goal, savedLat, savedLon]) => {
+    ]).then(([auto, idle, excluded, goal, weekGoal, savedLat, savedLon]) => {
       setAutostart(auto === true || auto === 'true')
       setIdleThreshold(typeof idle === 'number' ? idle : parseInt(String(idle ?? '60')) || 60)
       const goalMinutes = typeof goal === 'number' ? goal : parseInt(String(goal ?? '0')) || 0
       setWorkGoalHours(Math.round((goalMinutes / 60) * 10) / 10)
+      const weekGoalMinutes =
+        typeof weekGoal === 'number' ? weekGoal : parseInt(String(weekGoal ?? '')) || 40 * 60
+      setWeekGoalHours(Math.round((weekGoalMinutes / 60) * 10) / 10)
       setLat(savedLat === undefined || savedLat === null ? '' : String(savedLat))
       setLon(savedLon === undefined || savedLon === null ? '' : String(savedLon))
       setExcludedApps(Array.isArray(excluded) ? excluded : [])
@@ -48,6 +53,12 @@ export default function SettingsView(): JSX.Element {
     const safe = Math.max(0, Math.min(hours, 16))
     setWorkGoalHours(safe)
     await window.api.settings.set('dailyWorkGoal', Math.round(safe * 60))
+  }
+
+  const saveWeekGoal = async (hours: number): Promise<void> => {
+    const safe = Math.max(0, Math.min(hours, 80))
+    setWeekGoalHours(safe)
+    await window.api.settings.set('weeklyWorkGoal', Math.round(safe * 60))
   }
 
   const saveLocation = async (): Promise<void> => {
@@ -231,8 +242,24 @@ export default function SettingsView(): JSX.Element {
               Цель по работе
             </h3>
             <div className="text-xs text-tt-muted">
-              Сколько рабочих часов в день вы считаете нормой. Появится прогресс на «Сегодня» и
-              серия дней на «Неделе». Ноль — цель выключена.
+              Норма недели — 40 часов (пятидневка). Уровни считаются от неё: золото — норма,
+              серебро — на 5 часов меньше, бронза — на 10. Ноль — цель выключена.
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                max="80"
+                step="1"
+                value={weekGoalHours}
+                onChange={(e) => setWeekGoalHours(Number(e.target.value))}
+                onBlur={() => saveWeekGoal(weekGoalHours)}
+                className="w-24 rounded-lg border border-tt-border bg-tt-bg px-3 py-1.5 text-sm text-tt-text focus:border-tt-accent focus:outline-none"
+              />
+              <span className="text-xs text-tt-muted">часов в неделю</span>
+            </div>
+            <div className="text-xs text-tt-muted">
+              Дневная цель ниже — для прогресса на «Сегодня» и серии дней.
             </div>
             <div className="flex items-center gap-2">
               <input
