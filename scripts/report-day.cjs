@@ -209,6 +209,13 @@ function toMarkdown(report) {
   const lines = []
   lines.push(`## ${report.date}`)
   lines.push('')
+
+  // Пустой день — это факт, а не пустой список: дайджесту нужно понять,
+  // что трекер просто не работал
+  if (report.active === 0 && report.apps.length === 0 && report.meetings.length === 0) {
+    lines.push('Данных за день нет — трекер не работал.')
+    return lines.join('\n')
+  }
   lines.push(
     `Активность ${fmt(report.active)} · созвоны ${fmt(
       report.meetings.reduce((s, m) => s + m.minutes * 60, 0)
@@ -224,11 +231,13 @@ function toMarkdown(report) {
     lines.push('')
   }
 
-  lines.push('**Где время:**')
-  for (const a of report.apps.slice(0, 8)) {
-    lines.push(`- ${a.app} — ${fmt(a.seconds)}`)
+  if (report.apps.length > 0) {
+    lines.push('**Где время:**')
+    for (const a of report.apps.slice(0, 8)) {
+      lines.push(`- ${a.app} — ${fmt(a.seconds)}`)
+    }
+    lines.push('')
   }
-  lines.push('')
 
   if (report.domains.length > 0) {
     lines.push('**Сайты:**')
@@ -285,7 +294,7 @@ function main() {
     return
   }
 
-  process.stdout.write(reports.map(toMarkdown).join('\n'))
+  process.stdout.write(reports.map(toMarkdown).join('\n') + '\n')
 }
 
 try {
