@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **UI hierarchy rebuild, stage 1** — «Сегодня» no longer shows the same day three times at equal weight. New structure: one hero metric (activity + work / meetings / AFK / not recorded), a three-lane day strip (activity, meetings, idle gaps) with an hour scale, a «сейчас» marker and a legend, then the app list; raw events moved behind a button, and the duplicate total card is gone. Navigation is three labelled sections (Сегодня / Неделя / Настройки) instead of four unlabelled icons; «Работа» stopped being a separate screen — it is a «только работа» filter plus a Jira tasks section inside «Сегодня». App colours are now semantic (work / neutral / distracting) instead of a hash palette that meant nothing
+- **Day data refreshes together** — meetings and day coverage were fetched once when the screen opened, so a meeting that started later never appeared until the date changed. Everything now refreshes on the same 5-second tick
+- **`getDailyStats` returned only today** — the range was computed from `days` and then ignored (bounds were taken from today), so the stats chart showed one filled day and zeros around it. Bounds now come from the real range, and days are grouped in local time instead of UTC
+
 ### Added
 - **Meetings as a separate track** — a call and work in Figma happen at the same moment, so they must not be summed: that was the Google Meet double count. Meetings now live in their own `meetings` table (migration 007) as actual intervals, opened when `meet.google.com/...` appears and extended while the call is presumably running (10-minute timeout), and shown as a lane above the activity timeline plus a «В созвонах X (входит в активность)» line in the day card. The day total stays a union of activity intervals, so no hour is counted twice
 

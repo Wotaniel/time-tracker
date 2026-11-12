@@ -1,11 +1,15 @@
-import { useState, useEffect, useCallback, useRef, Component, type ReactNode } from 'react'
-import { Clock, Activity, BarChart3, Settings as SettingsIcon, ChevronRight, MoreVertical, Briefcase, AlertTriangle } from 'lucide-react'
-import type { CurrentActivity, DayCoverage, DetailedDaySummary, Meeting, WindowEntry, AppTag, TagType, TagTargetType, TrackingHealthStatus } from '../../shared/types'
-import { formatDuration, formatLocalDate } from './lib/format'
+import { useState, useEffect, Component, type ReactNode } from 'react'
+import {
+  AlertTriangle,
+  BarChart3,
+  Clock,
+  Settings as SettingsIcon,
+  Activity
+} from 'lucide-react'
+import type { CurrentActivity, TrackingHealthStatus } from '../../shared/types'
+import { TodayView } from './pages/TodayView'
 import StatsView from './pages/StatsView'
 import SettingsView from './pages/SettingsView'
-import LogView from './pages/LogView'
-import WorkView from './pages/WorkView'
 
 // ─── Error Boundary ────────────────────────────────────────────
 
@@ -23,7 +27,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: string |
           <h1 className="text-xl font-semibold text-tt-red">Что-то пошло не так</h1>
           <p className="max-w-md text-sm text-tt-muted">{this.state.error}</p>
           <p className="text-xs text-tt-muted">
-            window.api is {typeof window !== 'undefined' && 'api' in window ? 'available' : 'NOT available'}
+            window.api is{' '}
+            {typeof window !== 'undefined' && 'api' in window ? 'available' : 'NOT available'}
           </p>
         </div>
       )
@@ -38,7 +43,14 @@ function hasApi(): boolean {
   return typeof window !== 'undefined' && !!window.api
 }
 
-type View = 'timeline' | 'work' | 'stats' | 'settings'
+/** Три раздела с подписями: «Работа» перестала быть отдельным экраном */
+type View = 'today' | 'week' | 'settings'
+
+const NAV: { id: View; label: string; icon: typeof Clock }[] = [
+  { id: 'today', label: 'Сегодня', icon: Clock },
+  { id: 'week', label: 'Неделя', icon: BarChart3 },
+  { id: 'settings', label: 'Настройки', icon: SettingsIcon }
+]
 
 export default function App(): JSX.Element {
   if (!hasApi()) {
@@ -61,10 +73,8 @@ export default function App(): JSX.Element {
 }
 
 function AppInner(): JSX.Element {
-  const [view, setView] = useState<View>('timeline')
+  const [view, setView] = useState<View>('today')
   const [currentActivity, setCurrentActivity] = useState<CurrentActivity | null>(null)
-  const [summary, setSummary] = useState<DetailedDaySummary[]>([])
-  const [selectedDate, setSelectedDate] = useState(() => formatLocalDate(new Date()))
   const [health, setHealth] = useState<TrackingHealthStatus | null>(null)
 
   // Почему трекер не пишет: без этого состояния поломка выглядит как работающее
@@ -78,114 +88,63 @@ function AppInner(): JSX.Element {
     return window.api.health.onChanged(setHealth)
   }, [])
 
-  // Listen for real-time activity changes from main process
+  // Текущая активность в шапке
   useEffect(() => {
-    // Get initial activity
     window.api.tracking.getCurrent().then(setCurrentActivity)
 
-    // Subscribe to activity-changed events
-    const unsubscribe = window.api.tracking.onActivityChanged((activity) => {
+    return window.api.tracking.onActivityChanged((activity) => {
       setCurrentActivity(activity as CurrentActivity)
     })
-
-    return unsubscribe
   }, [])
-
-  // Load summary when date changes
-  const loadSummary = useCallback(async () => {
-    const result = await window.api.activities.getSummaryDetailed(selectedDate)
-    setSummary(result)
-  }, [selectedDate])
-
-  useEffect(() => {
-    loadSummary()
-    // Refresh summary every 5 seconds
-    const interval = setInterval(loadSummary, 5000)
-    return () => clearInterval(interval)
-  }, [loadSummary])
 
   return (
     <div className="flex h-screen bg-tt-bg text-tt-text">
-      {/* Sidebar — extra top padding for macOS traffic lights */}
-      <nav className="drag-region flex w-16 flex-col items-center gap-4 border-r border-tt-border bg-tt-surface pt-14 pb-6">
-        <button
-          className={`no-drag rounded-lg p-3 transition-colors ${view === 'timeline' ? 'bg-tt-accent/30 text-tt-accent' : 'text-tt-muted hover:text-tt-text'}`}
-          onClick={() => setView('timeline')}
-          title="Сегодня"
-        >
-          <Clock size={22} />
-        </button>
-        <button
-          className={`no-drag rounded-lg p-3 transition-colors ${view === 'work' ? 'bg-tt-accent/30 text-tt-accent' : 'text-tt-muted hover:text-tt-text'}`}
-          onClick={() => setView('work')}
-          title="Работа"
-        >
-          <Briefcase size={22} />
-        </button>
-        <button
-          className={`no-drag rounded-lg p-3 transition-colors ${view === 'stats' ? 'bg-tt-accent/30 text-tt-accent' : 'text-tt-muted hover:text-tt-text'}`}
-          onClick={() => setView('stats')}
-          title="Статистика"
-        >
-          <BarChart3 size={22} />
-        </button>
-        <button
-          className={`no-drag rounded-lg p-3 transition-colors ${view === 'settings' ? 'bg-tt-accent/30 text-tt-accent' : 'text-tt-muted hover:text-tt-text'}`}
-          onClick={() => setView('settings')}
-          title="Настройки"
-        >
-          <SettingsIcon size={22} />
-        </button>
+      {/* Sidebar — подписи под иконками: иконка без подписи не читается */}
+      <nav className="drag-region flex w-[78px] shrink-0 flex-col items-center gap-1 border-r border-tt-border bg-tt-surface pt-14 pb-6">
+        {NAV.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            className={`no-drag flex w-16 flex-col items-center gap-1 rounded-lg py-2 transition-colors ${
+              view === id
+                ? 'bg-tt-accent/20 text-tt-accent'
+                : 'text-tt-muted hover:bg-tt-bg/60 hover:text-tt-text'
+            }`}
+            onClick={() => setView(id)}
+            title={label}
+          >
+            <Icon size={20} />
+            <span className="text-[10px] leading-none">{label}</span>
+          </button>
+        ))}
       </nav>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-auto">
-        <header className="drag-region flex items-center justify-between border-b border-tt-border px-6 py-4">
-          <h1 className="text-lg font-semibold">
-            {view === 'timeline' ? 'Сегодня' : view === 'work' ? 'Работа' : view === 'stats' ? 'Статистика' : 'Настройки'}
-          </h1>
-          {/* Current activity indicator */}
-          <div className="no-drag flex items-center gap-2 text-sm">
-            <Activity
-              size={14}
-              className={
-                currentActivity?.isPaused
-                  ? 'text-tt-yellow'
-                  : currentActivity?.isAfk
-                    ? 'text-tt-muted'
-                    : 'text-tt-green'
-              }
-            />
-            <span className="max-w-md truncate text-tt-muted">
-              {currentActivity?.isPaused
-                ? '⏸ Пауза'
+      <main className="flex min-w-0 flex-1 flex-col">
+        <header className="drag-region flex h-12 shrink-0 items-center gap-2 border-b border-tt-border px-6">
+          <Activity
+            size={12}
+            className={
+              currentActivity?.isPaused
+                ? 'text-tt-yellow'
                 : currentActivity?.isAfk
-                  ? '😴 AFK'
-                  : currentActivity?.windowTitle
-                    ? `${currentActivity.appName} — ${currentActivity.windowTitle}`
-                    : `${currentActivity?.appName ?? '—'}`}
-            </span>
-          </div>
+                  ? 'text-tt-muted'
+                  : 'text-tt-green'
+            }
+          />
+          <span className="max-w-md truncate text-xs text-tt-muted">
+            {currentActivity?.isPaused
+              ? '⏸ Пауза'
+              : currentActivity?.isAfk
+                ? '😴 AFK'
+                : currentActivity?.windowTitle
+                  ? `${currentActivity.appName} — ${currentActivity.windowTitle}`
+                  : `${currentActivity?.appName ?? '—'}`}
+          </span>
         </header>
 
-        <div className="p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">
           {health && !health.tracking && <BlockedBanner health={health} />}
-          {view === 'timeline' && (
-            <>
-              <DaySummaryView
-                summary={summary}
-                selectedDate={selectedDate}
-                onDateChange={setSelectedDate}
-              />
-              <LogView
-                selectedDate={selectedDate}
-                onDateChange={setSelectedDate}
-                embedded
-              />
-            </>
-          )}
-          {view === 'work' && <WorkView />}
-          {view === 'stats' && <StatsView />}
+          {view === 'today' && <TodayView />}
+          {view === 'week' && <StatsView />}
           {view === 'settings' && <SettingsView />}
         </div>
       </main>
@@ -196,7 +155,7 @@ function AppInner(): JSX.Element {
 // ─── Blocked banner ────────────────────────────────────────────
 
 /**
- * Почему трекер не пишет. Две причины выглядят одинаково — пустая лента, —
+ * Почему трекер не пишет. Три причины выглядят одинаково — пустая лента, —
  * поэтому текст должен называть именно ту, что случилась.
  */
 function BlockedBanner({ health }: { health: TrackingHealthStatus }): JSX.Element {
@@ -208,9 +167,9 @@ function BlockedBanner({ health }: { health: TrackingHealthStatus }): JSX.Elemen
           <p className="text-sm font-medium">Активное окно не читается — трекинг не пишет данные</p>
           <p className="mt-1 text-xs text-tt-muted">
             Разрешение есть, но система больше не отдаёт список окон: обычно это отозванный
-            доступ «Запись экрана» или зависший системный помощник. Проверьте
-            Системные настройки → Конфиденциальность и безопасность → Запись экрана
-            и Запись системного аудио, затем перезапустите CarpeDiem.
+            доступ «Запись экрана» или зависший системный помощник. Проверьте Системные
+            настройки → Конфиденциальность и безопасность → Запись экрана, затем перезапустите
+            CarpeDiem.
           </p>
         </div>
       </div>
@@ -226,15 +185,17 @@ function BlockedBanner({ health }: { health: TrackingHealthStatus }): JSX.Elemen
           <p className="mt-1 text-xs text-tt-muted">
             macOS не сопоставит приложение с записью о разрешении, поэтому «Универсальный доступ»
             из Системных настроек не применяется. Обычно причина в том, что приложение запущено
-            из папки под iCloud Drive: синхронизация возвращает на бандл
-            посторонние атрибуты и ломает подпись.
+            из папки под iCloud Drive: синхронизация возвращает на бандл посторонние атрибуты и
+            ломает подпись.
           </p>
           <p className="mt-1 text-xs text-tt-muted">
-            Запускайте копию из /Applications: <code>npm run install:mac</code> собирает её и ставит
-            на место.
+            Запускайте копию из /Applications: <code>npm run install:mac</code> собирает её и
+            ставит на место.
           </p>
           {health.bundlePath && (
-            <p className="mt-1 truncate text-xs text-tt-muted">Сейчас запущено из {health.bundlePath}</p>
+            <p className="mt-1 truncate text-xs text-tt-muted">
+              Сейчас запущено из {health.bundlePath}
+            </p>
           )}
         </div>
       </div>
@@ -245,7 +206,9 @@ function BlockedBanner({ health }: { health: TrackingHealthStatus }): JSX.Elemen
     <div className="mb-4 flex items-start gap-3 rounded-lg border border-tt-yellow/40 bg-tt-yellow/10 p-4">
       <AlertTriangle size={18} className="mt-0.5 shrink-0 text-tt-yellow" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">Трекинг не работает: нет разрешения «Универсальный доступ»</p>
+        <p className="text-sm font-medium">
+          Трекинг не работает: нет разрешения «Универсальный доступ»
+        </p>
         <p className="mt-1 text-xs text-tt-muted">
           Без него macOS не отдаёт активное окно, поэтому в базу не пишется ни одного события.
           Включите CarpeDiem в Системных настройках → Конфиденциальность и безопасность →
@@ -261,557 +224,3 @@ function BlockedBanner({ health }: { health: TrackingHealthStatus }): JSX.Elemen
     </div>
   )
 }
-
-// ─── Day Summary View ──────────────────────────────────────────
-
-function DaySummaryView({
-  summary,
-  selectedDate,
-  onDateChange
-}: {
-  summary: DetailedDaySummary[]
-  selectedDate: string
-  onDateChange: (date: string) => void
-}): JSX.Element {
-  const totalActive = summary.reduce((sum, s) => sum + s.totalTime, 0)
-  const { tags, setTag, deleteTag } = useAppTags()
-  const [afkTime, setAfkTime] = useState(0)
-  const [coverage, setCoverage] = useState<DayCoverage | null>(null)
-  const [meetings, setMeetings] = useState<Meeting[]>([])
-
-  useEffect(() => {
-    window.api.activities.getAfkTime(selectedDate).then((secs: number) => {
-      setAfkTime(secs)
-    })
-    window.api.activities.getDayCoverage(selectedDate).then(setCoverage)
-    window.api.meetings.getDay(selectedDate).then(setMeetings)
-  }, [selectedDate])
-
-  const meetingTime = meetings.reduce((sum, m) => {
-    const end = m.tsEnd ? new Date(m.tsEnd).getTime() : Date.now()
-    return sum + Math.max(0, Math.round((end - new Date(m.tsStart).getTime()) / 1000))
-  }, 0)
-
-  // Date navigation
-  const shiftDate = (days: number): void => {
-    const d = new Date(selectedDate)
-    d.setDate(d.getDate() + days)
-    onDateChange(formatLocalDate(d))
-  }
-
-  const today = formatLocalDate(new Date())
-  const isToday = selectedDate === today
-
-  return (
-    <div className="space-y-6">
-      {/* Date navigation */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => shiftDate(-1)}
-          className="rounded-lg border border-tt-border px-3 py-1.5 text-sm hover:bg-tt-surface"
-        >
-          ← Назад
-        </button>
-        <div className="flex items-center gap-3">
-          <span className="text-lg font-medium">{selectedDate}</span>
-          {isToday && <span className="rounded bg-tt-accent/25 px-2 py-0.5 text-xs font-medium text-tt-accent">Сегодня</span>}
-        </div>
-        <button
-          onClick={() => shiftDate(1)}
-          disabled={isToday}
-          className="rounded-lg border border-tt-border px-3 py-1.5 text-sm hover:bg-tt-surface disabled:opacity-30"
-        >
-          Вперёд →
-        </button>
-      </div>
-
-      {/* Total active time + куда ушёл день */}
-      <div className="rounded-lg border border-tt-border bg-tt-surface p-4">
-        <div className="text-sm text-tt-muted">Всего активно</div>
-        <div className="mt-1 text-3xl font-semibold text-tt-text">{formatDuration(totalActive)}</div>
-        {coverage && coverage.span > 0 && (
-          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 border-t border-tt-border pt-3 text-xs text-tt-muted">
-            <span>
-              Вне AFK: <span className="text-tt-text">{formatDuration(coverage.active)}</span>
-            </span>
-            <span>
-              AFK: <span className="text-tt-text">{formatDuration(coverage.afk)}</span>
-            </span>
-            <span>
-              Не записано: <span className="text-tt-text">{formatDuration(coverage.uncovered)}</span>
-            </span>
-            <span>
-              Всего от первого события: <span className="text-tt-text">{formatDuration(coverage.span)}</span>
-            </span>
-            {meetingTime > 0 && (
-              <span title="Созвоны идут параллельно с работой и входят в активность, а не прибавляются к ней">
-                В созвонах: <span className="text-tt-purple">{formatDuration(meetingTime)}</span>
-                <span className="text-tt-muted"> (входит в активность)</span>
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* App list */}
-      <div>
-        <h2 className="mb-3 text-sm font-medium text-tt-muted">
-          Приложения ({summary.length})
-        </h2>
-        {summary.length === 0 ? (
-          <div className="rounded-lg border border-tt-border bg-tt-surface p-8 text-center text-tt-muted">
-            Нет данных за этот день.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {summary.map((item, idx) => (
-              <AppRow
-                key={`${item.appName}-${idx}`}
-                item={item}
-                maxTime={summary[0]?.totalTime ?? 1}
-                tags={tags}
-                onSetTag={setTag}
-                onDeleteTag={deleteTag}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* AFK time */}
-      {afkTime > 0 && (
-        <div>
-          <h2 className="mb-3 text-sm font-medium text-tt-muted">
-            Бездействие
-          </h2>
-          <div className="flex items-center gap-4 rounded-lg border border-tt-border bg-tt-surface/50 p-4">
-            <div
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-lg"
-              style={{ backgroundColor: '#414868' }}
-            >
-              😴
-            </div>
-            <div className="flex-1">
-              <div className="text-sm text-tt-muted">Всего AFK</div>
-              <div className="text-xl font-semibold text-tt-muted">
-                {formatDuration(afkTime)}
-              </div>
-            </div>
-            <div className="text-right text-xs text-tt-muted">
-              {afkTime > 60
-                ? `${Math.round(afkTime / 60)} мин`
-                : `${Math.round(afkTime)} сек`}
-              {' бездействие'}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── App icons & browser helpers ────────────────────────────────
-
-/** Браузеры — для них группируем вкладки по домену вместо имени окна */
-const BROWSER_APPS = new Set([
-  'Chrome', 'Google Chrome', 'Chromium', 'Brave Browser',
-  'Safari', 'Firefox', 'Arc', 'Microsoft Edge', 'Edge',
-  'Vivaldi', 'Opera', 'Thorium'
-])
-
-/** Проверяет, является ли приложение браузером */
-function isBrowser(appName: string): boolean {
-  return BROWSER_APPS.has(appName)
-}
-
-/** Извлекает домен из URL (без www.)
- *  Для localhost и IP-адресов включает порт: localhost:3001, 127.0.0.1:8080 */
-function extractDomain(url: string | null): string | null {
-  if (!url) return null
-  try {
-    const u = new URL(url)
-    const host = u.hostname.replace(/^www\./, '')
-    // localhost и IP-адреса — добавляем порт, чтобы отличать localhost:3001 от localhost:8501
-    if (host === 'localhost' || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
-      return u.port ? `${host}:${u.port}` : host
-    }
-    return host
-  } catch {
-  // Не валидный URL — попробуем найти домен вручную
-    const match = url.match(/(?:https?:\/\/)?(?:www\.)?([a-z0-9][a-z0-9.-]+\.[a-z]{2,})/i)
-    return match ? match[1] : null
-  }
-}
-
-/** Группировка вкладок браузера по домену */
-interface DomainGroup {
-  domain: string
-  totalTime: number
-  tabs: WindowEntry[]
-}
-
-function groupByDomain(windows: WindowEntry[]): DomainGroup[] {
-  const domainMap = new Map<string, DomainGroup>()
-
-  for (const win of windows) {
-    const domain = extractDomain(win.url) ?? '(no URL)'
-    let group = domainMap.get(domain)
-    if (!group) {
-      group = { domain, totalTime: 0, tabs: [] }
-      domainMap.set(domain, group)
-    }
-    group.totalTime += win.totalTime
-    group.tabs.push(win)
-  }
-
-  const groups = Array.from(domainMap.values())
-  groups.sort((a, b) => b.totalTime - a.totalTime)
-  return groups
-}
-
-/** Hook: загружает иконку приложения через IPC, кэширует в ref */
-const iconCache = new Map<string, string | null>()
-function useAppIcon(appName: string, bundleId?: string | null): string | null {
-  const [icon, setIcon] = useState<string | null>(() => {
-    const key = bundleId || appName
-    return iconCache.get(key) ?? null
-  })
-  const mountedRef = useRef(true)
-
-  useEffect(() => {
-    mountedRef.current = true
-    return () => { mountedRef.current = false }
-  }, [])
-
-  useEffect(() => {
-    const key = bundleId || appName
-    const cached = iconCache.get(key)
-    if (cached !== undefined) {
-      setIcon(cached)
-      return
-    }
-    // Загружаем иконку
-    window.api.apps.getIcon(appName, bundleId ?? undefined).then((dataUrl) => {
-      iconCache.set(key, dataUrl)
-      if (mountedRef.current) setIcon(dataUrl)
-    })
-  }, [appName, bundleId])
-
-  return icon
-}
-
-/** Компактная иконка 28×28 или fallback — первая буква в кружке */
-function AppIcon({ appName, bundleId }: { appName: string; bundleId?: string | null }): JSX.Element {
-  const icon = useAppIcon(appName, bundleId)
-  if (icon) {
-    return <img src={icon} alt={appName} className="h-7 w-7 shrink-0 rounded" />
-  }
-  // Fallback — кружок с первой буквой
-  const initial = appName.charAt(0).toUpperCase()
-  return (
-    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-tt-accent/30 text-xs font-bold text-tt-accent">
-      {initial}
-    </div>
-  )
-}
-
-// ─── Tags (work / neutral / distracting) ────────────────────────
-
-/** Конфиг тегов: цвет, label, цвет фона для badge */
-const TAG_CONFIG: Record<TagType, { label: string; color: string; bg: string }> = {
-  work: { label: 'Работа', color: '#9ece6a', bg: '#9ece6a22' },
-  neutral: { label: 'Нейтр.', color: '#7aa2f7', bg: '#7aa2f722' },
-  distracting: { label: 'Отвлечение', color: '#f7768e', bg: '#f7768e22' }
-}
-
-/** Загружает все теги и предоставляет set/delete с обновлением локального state */
-function useAppTags(): {
-  tags: Map<string, TagType>
-  setTag: (targetType: TagTargetType, targetKey: string, tag: TagType) => Promise<void>
-  deleteTag: (targetType: TagTargetType, targetKey: string) => Promise<void>
-} {
-  const [tagList, setTagList] = useState<AppTag[]>([])
-  const mountedRef = useRef(true)
-
-  useEffect(() => {
-    mountedRef.current = true
-    window.api.tags.getAll().then((tags) => {
-      if (mountedRef.current) setTagList(tags)
-    })
-    return () => { mountedRef.current = false }
-  }, [])
-
-  // Строим Map: "app:Visual Studio Code" → "work"
-  const tags = new Map<string, TagType>()
-  for (const t of tagList) {
-    tags.set(`${t.targetType}:${t.targetKey}`, t.tag)
-  }
-
-  const setTag = useCallback(async (targetType: TagTargetType, targetKey: string, tag: TagType) => {
-    // Оптимистичное обновление
-    setTagList((prev) => {
-      const filtered = prev.filter((t) => !(t.targetType === targetType && t.targetKey === targetKey))
-      return [...filtered, {
-        id: 0,
-        targetType,
-        targetKey,
-        tag,
-        updatedAt: new Date().toISOString()
-      }]
-    })
-    await window.api.tags.set(targetType, targetKey, tag)
-  }, [])
-
-  const deleteTag = useCallback(async (targetType: TagTargetType, targetKey: string) => {
-    setTagList((prev) => prev.filter((t) => !(t.targetType === targetType && t.targetKey === targetKey)))
-    await window.api.tags.delete(targetType, targetKey)
-  }, [])
-
-  return { tags, setTag, deleteTag }
-}
-
-/** Маленький цветной badge с названием тега */
-function TagBadge({ tag }: { tag: TagType }): JSX.Element {
-  const config = TAG_CONFIG[tag]
-  return (
-    <span
-      className="rounded px-1.5 py-0.5 text-[10px] font-medium"
-      style={{ color: config.color, backgroundColor: config.bg }}
-    >
-      {config.label}
-    </span>
-  )
-}
-
-/** Выпадающее меню «три точки» для выбора тега */
-function TagMenu({
-  currentTag,
-  onSelect,
-  onClear
-}: {
-  currentTag: TagType | undefined
-  onSelect: (tag: TagType) => void
-  onClear: () => void
-}): JSX.Element {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent): void => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          setOpen(!open)
-        }}
-        className="rounded p-1 text-tt-muted hover:bg-tt-bg hover:text-tt-text"
-        title="Установить тег"
-      >
-        <MoreVertical size={14} />
-      </button>
-      {open && (
-        <div
-          className="absolute right-0 top-full z-50 mt-1 min-w-[140px] rounded-lg border border-tt-border bg-tt-surface py-1 shadow-lg"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {(Object.keys(TAG_CONFIG) as TagType[]).map((tagType) => {
-            const config = TAG_CONFIG[tagType]
-            const isActive = currentTag === tagType
-            return (
-              <button
-                key={tagType}
-                onClick={() => {
-                  onSelect(tagType)
-                  setOpen(false)
-                }}
-                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-tt-bg ${isActive ? 'text-tt-text' : 'text-tt-muted'}`}
-              >
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: config.color }} />
-                {config.label}
-                {isActive && <span className="ml-auto text-tt-accent">✓</span>}
-              </button>
-            )
-          })}
-          {currentTag && (
-            <>
-              <div className="my-1 border-t border-tt-border" />
-              <button
-                onClick={() => {
-                  onClear()
-                  setOpen(false)
-                }}
-                className="flex w-full px-3 py-1.5 text-left text-xs text-tt-muted hover:bg-tt-bg"
-              >
-                Снять тег
-              </button>
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Single App Row ────────────────────────────────────────────
-
-interface AppRowProps {
-  item: DetailedDaySummary
-  maxTime: number
-  tags: Map<string, TagType>
-  onSetTag: (targetType: TagTargetType, targetKey: string, tag: TagType) => Promise<void>
-  onDeleteTag: (targetType: TagTargetType, targetKey: string) => Promise<void>
-}
-
-function AppRow({ item, maxTime, tags, onSetTag, onDeleteTag }: AppRowProps): JSX.Element {
-  const [expanded, setExpanded] = useState(false)
-  const barWidth = (item.totalTime / maxTime) * 100
-  const browser = isBrowser(item.appName)
-  const hasDetail = browser
-    ? groupByDomain(item.windows).length > 1
-    : item.windows.length > 1
-  const appTag = tags.get(`app:${item.appName}`)
-
-  return (
-    <div className="rounded-lg border border-tt-border bg-tt-surface">
-      <div
-        onClick={() => hasDetail && setExpanded(!expanded)}
-        className={`flex w-full items-center gap-2 p-3 text-left ${hasDetail ? 'cursor-pointer hover:bg-tt-bg/50' : 'cursor-default'}`}
-      >
-        {/* Chevron or spacer */}
-        <div className="w-4 shrink-0">
-          {hasDetail && (
-            <ChevronRight
-              size={16}
-              className={`text-tt-muted transition-transform ${expanded ? 'rotate-90' : ''}`}
-            />
-          )}
-        </div>
-        {/* App icon */}
-        <AppIcon appName={item.appName} bundleId={item.appBundleId} />
-        {/* Bar */}
-        <div className="relative h-8 flex-1 overflow-hidden rounded">
-          <div
-            className="absolute inset-y-0 left-0 rounded bg-tt-accent/35"
-            style={{ width: `${barWidth}%` }}
-            title={`${item.appName}\n${formatDuration(item.totalTime)} (${item.percentage.toFixed(0)}%)`}
-          />
-          <div className="relative flex h-full items-center gap-2 px-3">
-            <span className="text-sm font-medium">{item.appName}</span>
-            {appTag && <TagBadge tag={appTag} />}
-          </div>
-        </div>
-        {/* Time */}
-        <div className="w-20 text-right text-sm text-tt-muted">
-          {formatDuration(item.totalTime)}
-        </div>
-        {/* Percentage */}
-        <div className="w-12 text-right text-xs text-tt-muted">
-          {item.percentage.toFixed(0)}%
-        </div>
-        {/* Tag menu (three dots) */}
-        <TagMenu
-          currentTag={appTag}
-          onSelect={(tag) => onSetTag('app', item.appName, tag)}
-          onClear={() => onDeleteTag('app', item.appName)}
-        />
-      </div>
-
-      {/* Expanded: browser → domains with tabs; other apps → windows */}
-      {expanded && hasDetail && (
-        browser ? (
-          <BrowserDetail
-            windows={item.windows}
-            tags={tags}
-            onSetTag={onSetTag}
-            onDeleteTag={onDeleteTag}
-          />
-        ) : (
-          <div className="border-t border-tt-border px-3 pb-2 pt-1">
-            {item.windows.map((win, idx) => (
-              <div key={idx} className="flex items-center gap-2 py-1.5 pl-12">
-                <span className="flex-1 truncate text-xs text-tt-text/70">{win.windowTitle || '(empty)'}</span>
-                <span className="w-20 text-right text-xs text-tt-text/70">{formatDuration(win.totalTime)}</span>
-                <span className="w-12" />
-              </div>
-            ))}
-          </div>
-        )
-      )}
-    </div>
-  )
-}
-
-interface BrowserDetailProps {
-  windows: WindowEntry[]
-  tags: Map<string, TagType>
-  onSetTag: (targetType: TagTargetType, targetKey: string, tag: TagType) => Promise<void>
-  onDeleteTag: (targetType: TagTargetType, targetKey: string) => Promise<void>
-}
-
-/** Browser detail: domains with drill-down to individual tabs */
-function BrowserDetail({ windows, tags, onSetTag, onDeleteTag }: BrowserDetailProps): JSX.Element {
-  const groups = groupByDomain(windows)
-  const [expandedDomain, setExpandedDomain] = useState<string | null>(null)
-
-  return (
-    <div className="border-t border-tt-border px-3 pb-2 pt-1">
-      {groups.map((group) => {
-        const showTabs = expandedDomain === group.domain
-        const multiTabs = group.tabs.length > 1
-        const domainTag = tags.get(`domain:${group.domain}`)
-
-        return (
-          <div key={group.domain} className="py-1 pl-12">
-            <div
-              onClick={() => multiTabs && setExpandedDomain(showTabs ? null : group.domain)}
-              className={`flex w-full items-center gap-1.5 text-left ${multiTabs ? 'cursor-pointer' : 'cursor-default'}`}
-            >
-              {multiTabs && (
-                <ChevronRight
-                  size={12}
-                  className={`text-tt-muted transition-transform ${showTabs ? 'rotate-90' : ''}`}
-                />
-              )}
-              {!multiTabs && <div className="w-3" />}
-              <span className="flex-1 truncate text-xs font-medium text-tt-text/80">{group.domain}</span>
-              {domainTag && <TagBadge tag={domainTag} />}
-              <span className="w-20 text-right text-xs text-tt-muted">{formatDuration(group.totalTime)}</span>
-              <div className="w-12" />
-              <TagMenu
-                currentTag={domainTag}
-                onSelect={(tag) => onSetTag('domain', group.domain, tag)}
-                onClear={() => onDeleteTag('domain', group.domain)}
-              />
-            </div>
-
-            {showTabs && multiTabs && (
-              <div className="mt-0.5 ml-4 space-y-0.5 border-l border-tt-border/50 pl-3">
-                {group.tabs.map((tab, idx) => (
-                  <div key={idx} className="flex items-center gap-1 py-0.5">
-                    <span className="flex-1 truncate text-[11px] text-tt-muted">
-                      {tab.windowTitle || tab.url || '(empty)'}
-                    </span>
-                    <span className="w-20 text-right text-[11px] text-tt-muted">{formatDuration(tab.totalTime)}</span>
-                    <div className="w-12" />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-
