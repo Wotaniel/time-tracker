@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Rules and categories in Settings** — the API for categories and automation rules existed from the start (`categories:*`, `rules:*`, seeded by migrations) but had no user entry point at all: rules could not be seen, added or removed. Settings now lists categories with their productivity, lets you create and delete them, shows every rule as «field · match · value → category» and adds new ones with validation. The «Без тега» queue links here, closing the loop: classify a domain once by hand, then let a rule do it automatically
 - **«Без тега» — очередь разбора вместо невидимых часов** — new `activities:getUntagged` returns apps and domains that have no tag for the day, with time. «Не записано» and «без тега» are different things: the first means the app was not running, the second means the time exists but its category is unknown. The queue sits above the app list (action before passive reading) and every row carries a tag menu, so a domain can be classified once — for the past and the future
 
 ### Changed

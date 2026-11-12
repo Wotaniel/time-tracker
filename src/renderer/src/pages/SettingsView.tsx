@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Power, Clock, Download, ShieldOff, X, FileJson } from 'lucide-react'
+import { Power, Clock, Download, ShieldOff, X, FileJson, SlidersHorizontal } from 'lucide-react'
+import { RulesSection } from '../components/RulesSection'
 
 export default function SettingsView(): JSX.Element {
   const [autostart, setAutostart] = useState(false)
@@ -161,6 +162,15 @@ export default function SettingsView(): JSX.Element {
                 Экспорт JSON
               </button>
             </div>
+          </div>
+
+          {/* Rules & categories */}
+          <div className="space-y-4 rounded-lg border border-tt-border bg-tt-surface p-5">
+            <h3 className="flex items-center gap-2 text-sm font-medium">
+              <SlidersHorizontal size={16} className="text-tt-accent" />
+              Правила и категории
+            </h3>
+            <RulesSection />
           </div>
 
           {/* Exclusion list */}

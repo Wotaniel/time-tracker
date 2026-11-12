@@ -143,7 +143,7 @@ function AppInner(): JSX.Element {
 
         <div className="min-h-0 flex-1 overflow-y-auto p-6">
           {health && !health.tracking && <BlockedBanner health={health} />}
-          {view === 'today' && <TodayView />}
+          {view === 'today' && <TodayView onOpenSettings={() => setView('settings')} />}
           {view === 'week' && <WeekView />}
           {view === 'settings' && <SettingsView />}
         </div>

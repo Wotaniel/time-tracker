@@ -26,7 +26,7 @@ import { EventList } from '../components/EventList'
 
 type Filter = 'all' | 'work'
 
-export function TodayView(): JSX.Element {
+export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): JSX.Element {
   const [selectedDate, setSelectedDate] = useState(() => formatLocalDate(new Date()))
   const [summary, setSummary] = useState<DetailedDaySummary[]>([])
   const [events, setEvents] = useState<ActivityEvent[]>([])
@@ -180,11 +180,22 @@ export function TodayView(): JSX.Element {
       <section className="rounded-lg border border-tt-border bg-tt-surface">
         <div className="flex items-baseline justify-between px-4 py-2.5">
           <h2 className="text-xs font-medium uppercase tracking-wide text-tt-muted">Без тега</h2>
-          <span className="text-[11px] text-tt-muted">
-            {untaggedRows.length === 0
-              ? 'очередь пуста'
-              : `${untaggedRows.length} · ${formatDuration(untaggedTotal)}`}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-tt-muted">
+              {untaggedRows.length === 0
+                ? 'очередь пуста'
+                : `${untaggedRows.length} · ${formatDuration(untaggedTotal)}`}
+            </span>
+            {onOpenSettings && (
+              <button
+                onClick={onOpenSettings}
+                className="no-drag text-[11px] text-tt-accent hover:underline"
+                title="Правила и категории"
+              >
+                правила →
+              </button>
+            )}
+          </div>
         </div>
         {untaggedRows.length === 0 ? (
           <p className="border-t border-tt-border px-4 py-3 text-xs text-tt-muted">
