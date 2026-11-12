@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Calls are detected beyond Google Meet** — the detector only knew Meet URLs, so a Slack huddle was invisible even though it is the same parallel conversation. New `src/main/meeting-detect.ts` recognises Meet by link (and no longer treats `meet.google.com/home` as a call), Slack by the `Huddle:` window title (the real one: `Huddle: @person - company - Slack 🎤`, not `Huddle Preview`), Zoom by a `Zoom Meeting`/`Zoom Webinar` window, and Teams by an explicit meeting window. The source is written into the meeting interval. Rules live in one testable place: 12 tests, including titles taken from the real database. For Teams the rule is deliberately conservative — a topic-only window looks exactly like a chat, so a missed call is preferred over a phantom one
+
+### Added
 - **`npm run report:day`** — facts about a day in a machine-readable form, so the morning digest has something to read: `--date`, `--days`, `--format md|json`. Prints activity / AFK / not recorded, top apps, top sites, Jira task keys with time, merged meetings, and gaps over 15 minutes. Read-only, runs under `ELECTRON_RUN_AS_NODE=1 electron` because `better-sqlite3` is built for Electron's ABI; the database path can be overridden with `CARPEDIEM_DB`
 
 ### Fixed

@@ -4,6 +4,7 @@ import { app, systemPreferences } from 'electron'
 import type { DatabaseManager } from './database'
 import type { CurrentActivity } from '../shared/types'
 import { log } from './safe-log'
+import { detectMeeting } from './meeting-detect'
 
 /** Имена процесса трекера в dev-режиме — active-win может отдать 'Electron' */
 const SELF_APP_NAMES = new Set(['Electron'])
@@ -35,16 +36,6 @@ const POLL_FAILURE_LIMIT = 10
  * active-win на macOS возвращает loginwindow когда экран залочен,
  * ScreenSaverEngine — когда активен скринсейвер. Это не реальная активность. */
 const LOCKED_SCREEN_APPS = new Set(['loginwindow', 'ScreenSaverEngine'])
-
-/** Проверяет, что URL — это активный Google Meet звонок (не главная страница) */
-function isMeetCallUrl(url: string | null): boolean {
-  if (!url) return false
-  const idx = url.indexOf('meet.google.com/')
-  if (idx === -1) return false
-  // Есть что-то после последнего / (код встречи)
-  const after = url.substring(idx + 'meet.google.com/'.length)
-  return after.length > 0
-}
 
 /** Ключевые слова private/incognito в заголовке окна → приватный режим */
 const PRIVATE_KEYWORDS = ['incognito', 'private browsing', 'private window', 'little arc']
@@ -268,17 +259,22 @@ export class TrackingEngine extends EventEmitter {
    * её появления не прошёл таймаут: созвон продолжается, даже если окно
    * переключили.
    */
-  private updateMeetingTracking(url: string | null, now: number): void {
-    if (isMeetCallUrl(url)) {
+  private updateMeetingTracking(
+    win: { appName: string; windowTitle: string; url: string | null },
+    now: number
+  ): void {
+    const detected = detectMeeting(win)
+
+    if (detected) {
       if (!this.meetingActive) {
         this.meetingActive = true
         this.meetingId = this.db.startMeeting(
           new Date(now).toISOString(),
-          url,
-          'Google Meet'
+          detected.url,
+          detected.source
         )
         this.lastMeetingWrite = now
-        log.info('[TrackingEngine] Meeting started')
+        log.info(`[TrackingEngine] Meeting started (${detected.source})`)
       }
       this.meetingLastSeen = now
       this.flushMeeting(now)
@@ -398,8 +394,8 @@ export class TrackingEngine extends EventEmitter {
       const appBundleId = 'bundleId' in win.owner ? (win.owner as { bundleId?: string }).bundleId : undefined
       const url = 'url' in win ? (win as { url?: string }).url ?? null : null
 
-      // Google Meet background tracking — update meeting state before normal tracking
-      this.updateMeetingTracking(url, Date.now())
+      // Созвон (Meet / Zoom / Teams / Slack huddle) — состояние обновляем до обычного трекинга
+      this.updateMeetingTracking({ appName, windowTitle, url }, Date.now())
 
       // Locked screen / screensaver — not real activity, don't record.
       // This catches cases where lock-screen event hasn't fired yet (race),
