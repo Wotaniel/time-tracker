@@ -118,6 +118,13 @@ export interface TaskStat {
   apps: string[]
 }
 
+/** Насколько часто срабатывало правило за день — чтобы правила были видны */
+export interface RuleUsage {
+  ruleId: number
+  matches: number
+  seconds: number
+}
+
 /**
  * Время, у которого нет категории: приложение или домен без тега.
  * Это очередь разбора — время есть, но неизвестно, работа это или отвлечение.
@@ -190,6 +197,7 @@ export const IPC_CHANNELS = {
   RULES_GET_ALL: 'rules:getAll',
   RULES_UPSERT: 'rules:upsert',
   RULES_DELETE: 'rules:delete',
+  RULES_GET_USAGE: 'rules:getUsage',
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
   TRACKING_GET_CURRENT: 'tracking:getCurrent',
@@ -246,6 +254,7 @@ export interface TimeTrackerApi {
     getAll: () => Promise<CategoryRule[]>
     upsert: (rule: Partial<CategoryRule>) => Promise<CategoryRule>
     delete: (id: number) => Promise<void>
+    getUsage: (date: string) => Promise<RuleUsage[]>
   }
   settings: {
     get: (key: string) => Promise<unknown>

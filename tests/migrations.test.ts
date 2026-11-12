@@ -29,6 +29,19 @@ describe('раннер миграций', () => {
     db.close()
   })
 
+  it('не оставляет дублей правил (миграция 009)', () => {
+    const db = createTestDb()
+    const row = db
+      .prepare(
+        `SELECT count(*) AS total,
+                count(DISTINCT category_id || '|' || field || '|' || match_type || '|' || value) AS uniqueRules
+         FROM category_rules`
+      )
+      .get() as { total: number; uniqueRules: number }
+    expect(row.total).toBe(row.uniqueRules)
+    db.close()
+  })
+
   it('переносит события Google Meet в созвоны (миграция 008)', () => {
     const db = createTestDb()
     const events = db.prepare("SELECT count(*) c FROM events WHERE app_name = 'Google Meet'").get() as {

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Categories and rules are visible** — rules were applied on event insert and left no trace anywhere: you could not tell whether they worked at all. The app list now shows a category badge (Figma → Development, Slack → Communication) with its colour, the day-strip tooltip names the category, and Settings shows for each rule how many times it fired today and how much time it covered
+- **Duplicate rules removed** — the database held 1650 rules where only 30 were unique: migration 002 seeds ran on every launch before `schema_migrations` existed, producing 55 copies of each rule. `categorizeEvent` parsed all 1650 rows on every event insert. Migration 009 keeps one row per (category, field, match, value)
+
 ### Changed
 - **One colour palette for the whole app** — the day card painted «работа» and «AFK» in plain text while the strip legend painted them green and grey, and «отвлечение» and «не записано» shared the same red although one is a choice and the other is a hole in the data. Colours now live in `lib/colors.ts` and are used by the day card, the strip legend, tag badges and the week KPIs; «не записано» moved to amber so it no longer reads as «отвлечение»
 

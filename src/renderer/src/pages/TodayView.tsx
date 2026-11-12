@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ChevronDown, ChevronLeft, ChevronRight, List } from 'lucide-react'
 import type {
   ActivityEvent,
+  Category,
   DayCoverage,
   DetailedDaySummary,
   Meeting,
@@ -39,6 +40,7 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
   const [showTasks, setShowTasks] = useState(false)
   const [tasks, setTasks] = useState<TaskStat[]>([])
   const [untagged, setUntagged] = useState<UntaggedEntry[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const { tags, setTag, deleteTag } = useAppTags()
 
   // Всё, что показывает день, обновляется вместе: раньше созвоны и покрытие
@@ -63,6 +65,20 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
     const interval = setInterval(() => void load(), 5000)
     return () => clearInterval(interval)
   }, [load])
+
+  // Категории приходят из правил: показываем их, иначе работа правил не видна
+  useEffect(() => {
+    window.api.categories.getAll().then(setCategories)
+  }, [])
+
+  const categoryById = new Map(categories.map((c) => [c.id, c]))
+  const categoryFor = useCallback(
+    (id: number | null | undefined): string | null => {
+      if (!id) return null
+      return categoryById.get(id)?.name ?? null
+    },
+    [categories]
+  )
 
   useEffect(() => {
     if (!showTasks) return
@@ -200,7 +216,13 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
 
       {/* ─── Слой 2: лента дня ──────────────────────────────── */}
       <section className="rounded-lg border border-tt-border bg-tt-surface p-5">
-        <DayLane events={events} meetings={mergedMeetings} date={selectedDate} tagFor={tagFor} />
+        <DayLane
+          events={events}
+          meetings={mergedMeetings}
+          date={selectedDate}
+          tagFor={tagFor}
+          categoryFor={categoryFor}
+        />
       </section>
 
       {/* ─── Слой «без тега»: время есть, категории нет ──────── */}
@@ -299,6 +321,9 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
                 key={`${item.appName}-${idx}`}
                 item={item}
                 seconds={secondsFor(item)}
+                category={
+                  item.categoryId ? categoryById.get(item.categoryId) ?? null : null
+                }
                 maxTime={maxTime}
                 tags={tags}
                 onSetTag={setTag}
@@ -378,6 +403,7 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
 function AppRow({
   item,
   seconds,
+  category,
   maxTime,
   tags,
   onSetTag,
@@ -385,6 +411,7 @@ function AppRow({
 }: {
   item: DetailedDaySummary
   seconds: number
+  category: Category | null
   maxTime: number
   tags: Map<string, TagType>
   onSetTag: (targetType: TagTargetType, targetKey: string, tag: TagType) => Promise<void>
@@ -426,6 +453,19 @@ function AppRow({
           <div className="relative flex h-full items-center gap-2 px-2">
             <span className="truncate text-sm">{item.appName}</span>
             {appTag && <TagBadge tag={appTag} />}
+            {category && (
+              <span
+                className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px]"
+                style={{ color: category.color, backgroundColor: `${category.color}22` }}
+                title={`Категория «${category.name}» — проставлена правилом`}
+              >
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: category.color }}
+                />
+                {category.name}
+              </span>
+            )}
           </div>
         </div>
         <span className="w-16 text-right text-sm tabular-nums text-tt-muted">

@@ -20,6 +20,7 @@ interface DayLaneProps {
   meetings: Meeting[]
   date: string
   tagFor: (appName: string, url: string | null) => TagType | undefined
+  categoryFor: (categoryId: number | null | undefined) => string | null
 }
 
 interface HoverInfo {
@@ -37,7 +38,7 @@ function meetingCode(url: string | null): string | null {
   return match ? match[1] : null
 }
 
-export function DayLane({ events, meetings, date, tagFor }: DayLaneProps): JSX.Element {
+export function DayLane({ events, meetings, date, tagFor, categoryFor }: DayLaneProps): JSX.Element {
   const [hover, setHover] = useState<HoverInfo | null>(null)
 
   const dayStart = new Date(`${date}T00:00:00`).getTime()
@@ -66,7 +67,10 @@ export function DayLane({ events, meetings, date, tagFor }: DayLaneProps): JSX.E
           `${formatTimeSec(e.tsStart)}–${formatTimeSec(e.tsEnd)}`,
           ...(e.windowTitle ? [e.windowTitle] : []),
           ...(e.url ? [e.url] : []),
-          ...(tag ? [`тег: ${tag === 'work' ? 'работа' : tag === 'neutral' ? 'нейтрально' : 'отвлечение'}`] : [])
+          ...(tag
+            ? [`тег: ${tag === 'work' ? 'работа' : tag === 'neutral' ? 'нейтрально' : 'отвлечение'}`]
+            : []),
+          ...(categoryFor(e.categoryId) ? [`категория: ${categoryFor(e.categoryId)}`] : [])
         ]
       }
     }

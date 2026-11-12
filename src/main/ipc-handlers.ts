@@ -127,6 +127,11 @@ export function registerIpcHandlers(
     db.deleteRule(id)
   })
 
+  ipcMain.handle(IPC_CHANNELS.RULES_GET_USAGE, (_event, date: string) => {
+    validateDate(date)
+    return db.getRuleUsage(date)
+  })
+
   // ─── Settings ─────────────────────────────────────────────
 
   ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, (_event, key: string) => {
