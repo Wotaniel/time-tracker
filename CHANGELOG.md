@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Hour scale shows all 24 hours with ticks** — the strip had nine labels placed with `justify-between`, and the working part of the day occupies a third of the width, so there was nothing to measure against. Every hour now has a tick, all 24 numbers are labelled at their real positions, and 0 / 6 / 12 / 18 are set in semibold
+
 ### Fixed
 - **A hole inside a call** — Meet lives in a browser tab, and the window list only exposes the title of the *active* tab, so while you work elsewhere there is simply no signal. The engine closed the interval after 10 minutes and reopened it later, leaving a 17-minute gap in the middle of a call. Tolerance raised to 20 minutes for Meet, and the same 20 minutes is used when merging intervals of one room: today's two calls now render as two continuous bars instead of three slivers with a hole
 
