@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { detectMeeting } from '../src/main/meeting-detect'
+import { detectMeeting, detectMeetingAmong } from '../src/main/meeting-detect'
 
 const win = (appName: string, windowTitle = '', url: string | null = null): ReturnType<typeof detectMeeting> =>
   detectMeeting({ appName, windowTitle, url })
@@ -75,5 +75,35 @@ describe('обычная работа', () => {
     expect(win('Figma', 'Design - Agile Board')).toBeNull()
     expect(win('Brave Browser', '[AG-61950] Проработать UX - Jira', 'https://jira.int.agrd.dev/browse/AG-61950')).toBeNull()
     expect(win('Code', 'tracking-engine.ts')).toBeNull()
+  })
+})
+
+describe('созвон среди открытых окон', () => {
+  const windows = [
+    { appName: 'Figma', windowTitle: 'Design - Agile Board', url: null },
+    { appName: 'Code', windowTitle: 'tracking-engine.ts', url: null },
+    {
+      appName: 'Slack',
+      windowTitle: 'Huddle: @Dmitriy Akhromeyko - AdGuard Software Ltd - Slack 🎤',
+      url: null
+    },
+    { appName: 'Brave Browser', windowTitle: 'Jira', url: 'https://jira.int.agrd.dev/browse/AG-1' }
+  ]
+
+  it('находит хаддл, даже когда он не первое окно и не в фокусе', () => {
+    expect(detectMeetingAmong(windows)?.source).toBe('Slack huddle')
+  })
+
+  it('возвращает null, если созвонов нет', () => {
+    expect(detectMeetingAmong(windows.slice(0, 2))).toBeNull()
+    expect(detectMeetingAmong([])).toBeNull()
+  })
+
+  it('предпочитает первое найденное окно созвона', () => {
+    const withZoom = [
+      { appName: 'zoom.us', windowTitle: 'Zoom Meeting', url: null },
+      ...windows
+    ]
+    expect(detectMeetingAmong(withZoom)?.source).toBe('Zoom')
   })
 })

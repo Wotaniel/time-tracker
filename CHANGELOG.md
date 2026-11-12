@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Calls are tracked in the background, not only when focused** — a huddle disappeared from tracking the moment you switched to Figma. The engine now reads the list of open windows every 5 seconds: the call window appearing starts the interval, its disappearance (pressing «end call») finishes it, and the end is stamped at the last moment it was seen. For Google Meet, whose tab is not visible in the window list, the old 10-minute safety net remains
+- **The `active-win` helper now has a timeout and is killed on hang** — the package called `execFile` without a timeout, so a stuck helper stayed alive while `setInterval` kept spawning new ones. `src/main/active-window.ts` runs the helper itself with a 3-second timeout
+
 ### Changed
 - **The «Без тега» block disappears when the queue is empty** — it used to take a full card to say «Всё размечено», which is noise on a day when there is nothing to triage. The rules entry point stays in Settings
 
