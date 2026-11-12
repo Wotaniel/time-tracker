@@ -27,4 +27,12 @@ mac:
   hardenedRuntime: true
   gatekeeperAssess: false
   identity: null
+  # Без NSAppleEventsUsageDescription macOS молча отказывает в Apple Events
+  # (видно в логе tccd: "Refusing TCCAccessRequestIndirect ... without NSAppleEvents").
+  # active-win читает URL активной вкладки именно через Apple Events, поэтому
+  # браузеры перестают делиться на сайты: url приходит пустой.
+  extendInfo:
+    NSAppleEventsUsageDescription: >-
+      CarpeDiem читает адрес активной вкладки браузера, чтобы показывать,
+      сколько времени ушло на каждый сайт.
 afterPack: scripts/after-pack.cjs

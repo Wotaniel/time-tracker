@@ -24,6 +24,7 @@ import type {
   Category,
   CategoryRule,
   DaySummary,
+  DayCoverage,
   DailyStat,
   HeatmapCell,
   DetailedDaySummary,
@@ -108,6 +109,8 @@ export class DatabaseManager {
   getDaySummary(date: string): DaySummary[] { return this.events.getDaySummary(date) }
   getDaySummaryDetailed(date: string): DetailedDaySummary[] { return this.events.getDaySummaryDetailed(date) }
   getAfkTimeForDay(date: string): number { return this.events.getAfkTimeForDay(date) }
+  getDayCoverage(date: string): DayCoverage { return this.events.getDayCoverage(date) }
+  updateEventProgress(id: number, tsEnd: string, duration: number): void { this.events.updateEventProgress(id, tsEnd, duration) }
 
   // CategoryRepository
   getAllCategories(): Category[] { return this.categories.getAllCategories() }

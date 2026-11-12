@@ -50,6 +50,17 @@ export interface DaySummary {
   categoryName?: string
 }
 
+/**
+ * Покрытие дня: на что ушло время с первого до последнего события.
+ * Без разбивки день выглядит короче, чем был, и не видно, куда делось остальное.
+ */
+export interface DayCoverage {
+  active: number // seconds
+  afk: number // seconds
+  uncovered: number // seconds — приложение не работало
+  span: number // seconds — от первого события до последнего
+}
+
 /** Окно/вкладка внутри приложения — для детальной разбивки */
 export interface WindowEntry {
   windowTitle: string
@@ -96,8 +107,7 @@ export interface TaskStat {
 }
 
 /** Детальная сводка за день: appName с разбивкой по окнам/вкладкам */
-export interface DetailedDaySummary {
-  appName: string
+export interface DetailedDaySummary {  appName: string
   appBundleId?: string | null
   totalTime: number // seconds
   percentage: number
@@ -148,6 +158,7 @@ export const IPC_CHANNELS = {
   STATS_GET_WORK: 'stats:getWork',
   STATS_GET_TASKS: 'stats:getTasks',
   ACTIVITIES_GET_AFK_TIME: 'activities:getAfkTime',
+  ACTIVITIES_GET_DAY_COVERAGE: 'activities:getDayCoverage',
   CATEGORIES_GET_ALL: 'categories:getAll',
   CATEGORIES_UPSERT: 'categories:upsert',
   CATEGORIES_DELETE: 'categories:delete',
@@ -186,6 +197,7 @@ export interface TimeTrackerApi {
     getSummary: (date: string) => Promise<DaySummary[]>
     getSummaryDetailed: (date: string) => Promise<DetailedDaySummary[]>
     getAfkTime: (date: string) => Promise<number>
+    getDayCoverage: (date: string) => Promise<DayCoverage>
   }
   stats: {
     getDaily: (days: number) => Promise<DailyStat[]>

@@ -22,7 +22,8 @@ const api = {
     getRange: (from: string, to: string) => ipcRenderer.invoke(IPC_CHANNELS.ACTIVITIES_GET_RANGE, from, to),
     getSummary: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.ACTIVITIES_GET_SUMMARY, date),
     getSummaryDetailed: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.ACTIVITIES_GET_SUMMARY_DETAILED, date),
-    getAfkTime: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.ACTIVITIES_GET_AFK_TIME, date)
+    getAfkTime: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.ACTIVITIES_GET_AFK_TIME, date),
+    getDayCoverage: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.ACTIVITIES_GET_DAY_COVERAGE, date)
   },
   stats: {
     getDaily: (days: number) => ipcRenderer.invoke(IPC_CHANNELS.STATS_GET_DAILY, days),

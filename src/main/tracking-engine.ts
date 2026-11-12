@@ -22,6 +22,9 @@ function isSelfActivity(win: NonNullable<Awaited<ReturnType<typeof activeWin>>>)
   return SELF_APP_NAMES.has(appName) || appName === app.getName()
 }
 
+/** Как часто пишем прогресс открытого события, чтобы сводки были живыми */
+const PROGRESS_INTERVAL_MS = 5000
+
 /** Приложения, которые появляются когда экран заблокирован / скринсейвер.
  * active-win на macOS возвращает loginwindow когда экран залочен,
  * ScreenSaverEngine — когда активен скринсейвер. Это не реальная активность. */
@@ -72,6 +75,7 @@ export class TrackingEngine extends EventEmitter {
   private isAfk: boolean = false
   private excludedApps: Set<string> = new Set()
   private hasAccessibilityPermission: boolean = false
+  private lastProgressAt: number = 0
 
   // ─── Google Meet background tracking ────────────────────
   // Когда созвон активен (meet.google.com в foreground),
@@ -79,8 +83,6 @@ export class TrackingEngine extends EventEmitter {
   // но звонок продолжает идти. Мы отслеживаем параллельный
   // фоновый event для Meet, чтобы время звонка не терялось.
   private meetingActive: boolean = false  // идёт ли сейчас созвон
-  private meetingEventId: number | null = null  // ID фонового event
-  private meetingEventStart: number = 0  // Date.now() начала фонового event
   private meetingLastSeen: number = 0  // Date.now() последнего наблюдения Meet
   private readonly MEETING_TIMEOUT_MS = 10 * 60 * 1000 // 10 мин без Meet → созвон окончен
 
@@ -143,7 +145,6 @@ export class TrackingEngine extends EventEmitter {
       clearInterval(this.intervalId)
       this.intervalId = null
     }
-    this.closeMeetingEvent()
     this.closeCurrentEvent()
     log.info('[TrackingEngine] Stopped')
   }
@@ -241,63 +242,25 @@ export class TrackingEngine extends EventEmitter {
 
   // ─── Google Meet background tracking ────────────────────────
 
-  private startMeetingEvent(now: number): void {
-    const tsNow = new Date(now).toISOString()
-    this.meetingEventStart = now
-    this.meetingEventId = this.db.insertEvent({
-      tsStart: tsNow,
-      tsEnd: tsNow, // обновится при закрытии
-      duration: 0,
-      appName: 'Google Meet',
-      appBundleId: undefined,
-      windowTitle: 'Meeting (background)',
-      url: 'https://meet.google.com',
-      categoryId: null,
-      isAfk: false,
-      isPrivate: false
-    })
-    log.info('[TrackingEngine] Background meeting event started')
-  }
-
-  private closeMeetingEvent(endTime?: number): void {
-    if (this.meetingEventId === null) return
-    const end = endTime ?? Date.now()
-    const tsEnd = new Date(end).toISOString()
-    const duration = Math.round((end - this.meetingEventStart) / 1000)
-    this.db.closeEvent(this.meetingEventId, tsEnd, duration)
-    this.meetingEventId = null
-    this.meetingEventStart = 0
-    log.info(`[TrackingEngine] Background meeting event closed (duration: ${duration}s)`)
-  }
-
   /**
-   * Обработка фонового трекинга Google Meet.
-   * Вызывается в poll() после получения activeWin.
+   * Обработка Google Meet. Фоновое событие больше не пишем: оно шло
+   * параллельно обычным событиям и попадало в те же SUM(duration), то есть
+   * время созвона считалось дважды (а при закрытии по meetingLastSeen
+   * получалась отрицательная длительность — конец раньше начала).
+   * Пока пользователь на созвоне и переключается в другие окна, его время
+   * и так записано обычными событиями. Здесь остаётся только состояние
+   * встречи: во время неё AFK не срабатывает.
    */
   private updateMeetingTracking(url: string | null, now: number): void {
-    const isMeet = isMeetCallUrl(url)
-
-    if (isMeet) {
-      // Meet в foreground — закрываем фоновый event (если был),
-      // foreground event запишется обычным путём.
-      if (this.meetingEventId !== null) {
-        this.closeMeetingEvent(now)
-      }
+    if (isMeetCallUrl(url)) {
       this.meetingActive = true
       this.meetingLastSeen = now
-    } else if (this.meetingActive) {
-      // Meet не в foreground, но созвон может идти
-      if (now - this.meetingLastSeen > this.MEETING_TIMEOUT_MS) {
-        // Созвон окончен (не видели Meet > 10 мин)
-        this.meetingActive = false
-        this.closeMeetingEvent(this.meetingLastSeen)
-        log.info('[TrackingEngine] Meeting ended (timeout)')
-      } else {
-        // Созвон продолжается в фоне — запускаем фоновый event если нужно
-        if (this.meetingEventId === null) {
-          this.startMeetingEvent(now)
-        }
-      }
+      return
+    }
+
+    if (this.meetingActive && now - this.meetingLastSeen > this.MEETING_TIMEOUT_MS) {
+      this.meetingActive = false
+      log.info('[TrackingEngine] Meeting ended (timeout)')
     }
   }
 
@@ -407,6 +370,10 @@ export class TrackingEngine extends EventEmitter {
         this.closeCurrentEvent()
         this.startNewEvent(appName, windowTitle, appBundleId, url)
         this.emitActivityChanged()
+      } else {
+        // Ничего не изменилось — подтягиваем длительность открытого события,
+        // иначе текущий кусок активности не виден ни в одной сводке
+        this.flushProgress()
       }
     } catch (err) {
       // Catch-all: any exception in poll() would otherwise kill the
@@ -424,6 +391,7 @@ export class TrackingEngine extends EventEmitter {
   ): void {
     const now = new Date().toISOString()
     this.currentTsStart = now
+    this.lastProgressAt = Date.now()
     this.currentAppName = appName
     this.currentWindowTitle = windowTitle
     this.currentUrl = url
@@ -440,6 +408,26 @@ export class TrackingEngine extends EventEmitter {
       isAfk: false,
       isPrivate: false
     })
+  }
+
+  /**
+   * Пишет прогресс открытого события (ts_end + duration) по ходу работы.
+   * Длительность иначе появляется только при закрытии события, из-за чего
+   * «за сегодня» отставало на всё текущее время в окне.
+   */
+  private flushProgress(): void {
+    if (this.currentEventId === null || this.currentTsStart === null) return
+
+    const now = Date.now()
+    if (now - this.lastProgressAt < PROGRESS_INTERVAL_MS) return
+    this.lastProgressAt = now
+
+    try {
+      const duration = Math.round((now - new Date(this.currentTsStart).getTime()) / 1000)
+      this.db.updateEventProgress(this.currentEventId, new Date(now).toISOString(), duration)
+    } catch (err) {
+      log.error('[TrackingEngine] progress update failed:', err)
+    }
   }
 
   private closeCurrentEvent(): void {

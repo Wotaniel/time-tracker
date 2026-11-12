@@ -261,7 +261,8 @@ app.whenReady().then(() => {
 
   // Initialize AFK detector — load threshold from DB settings
   const savedThreshold = db.getSetting('idleThreshold')
-  const idleThreshold = savedThreshold ? parseInt(savedThreshold) || 60 : 60
+  // 10 минут по умолчанию: 2 минуты резали обычное чтение и обдумывание
+  const idleThreshold = savedThreshold ? parseInt(savedThreshold) || 600 : 600
   afkDetector = new AFKDetector(idleThreshold)
   // Suppress AFK during Google Meet calls (user may not touch keyboard/mouse)
   afkDetector.setExemptCallback(() => tracker?.isMeetingActive() ?? false)
