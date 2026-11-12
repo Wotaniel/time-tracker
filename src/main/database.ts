@@ -121,6 +121,7 @@ export class DatabaseManager {
   extendMeeting(id: number, tsEnd: string): void { this.meetings.extendMeeting(id, tsEnd) }
   closeMeeting(id: number, tsEnd: string): void { this.meetings.closeMeeting(id, tsEnd) }
   getMeetingsByDay(date: string): Meeting[] { return this.meetings.getMeetingsByDay(date) }
+  getMeetingsByRange(fromDate: string, toDate: string): Meeting[] { return this.meetings.getMeetingsByRange(fromDate, toDate) }
 
   // CategoryRepository
   getAllCategories(): Category[] { return this.categories.getAllCategories() }
