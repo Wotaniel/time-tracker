@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Looking at the stats left a hole in the day** — the engine closed the current event and recorded nothing while CarpeDiem's own window was in front, so the day strip had gaps and the header read «Idle». Own window is now tracked like any other app under the name `CarpeDiem`; it is untagged, so it shows up in the «Без тега» queue instead of inflating work
+- **«Приложение не работало» was a wrong label** — a gap means only «no events», which happens when the app was closed, paused, or its own window was open. The tooltip now says «Нет событий» and lists the causes instead of asserting one
+- **One call showed as two slivers** — a restart closes the meeting interval, so a single call became two rows with a one-minute gap and the strip drew them as separate strokes. Adjacent intervals of the same meeting are merged (gap ≤ 2 min) for both the strip and the total
+
 ### Added
 - **Rules and categories in Settings** — the API for categories and automation rules existed from the start (`categories:*`, `rules:*`, seeded by migrations) but had no user entry point at all: rules could not be seen, added or removed. Settings now lists categories with their productivity, lets you create and delete them, shows every rule as «field · match · value → category» and adds new ones with validation. The «Без тега» queue links here, closing the loop: classify a domain once by hand, then let a rule do it automatically
 - **«Без тега» — очередь разбора вместо невидимых часов** — new `activities:getUntagged` returns apps and domains that have no tag for the day, with time. «Не записано» and «без тега» are different things: the first means the app was not running, the second means the time exists but its category is unknown. The queue sits above the app list (action before passive reading) and every row carries a tag menu, so a domain can be classified once — for the past and the future
