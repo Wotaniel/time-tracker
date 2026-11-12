@@ -33,10 +33,12 @@ import type {
   TagType,
   TagStat,
   WorkAppStat,
-  TaskStat
+  TaskStat,
+  Meeting
 } from '../shared/types'
 import { runMigrations } from './db/migrations'
 import { EventRepository } from './db/event-repository'
+import { MeetingRepository } from './db/meeting-repository'
 import { CategoryRepository } from './db/category-repository'
 import { TagRepository } from './db/tag-repository'
 import { StatsRepository } from './db/stats-repository'
@@ -55,6 +57,7 @@ export class DatabaseManager {
   readonly tags: TagRepository
   readonly stats: StatsRepository
   readonly settings: SettingsRepository
+  readonly meetings: MeetingRepository
 
   constructor(dbPath?: string) {
     const path = dbPath ?? this.getDefaultDbPath()
@@ -72,6 +75,7 @@ export class DatabaseManager {
 
     // Композируем репозитории
     this.events = new EventRepository(this.db)
+    this.meetings = new MeetingRepository(this.db)
     this.categories = new CategoryRepository(this.db)
     this.tags = new TagRepository(this.db)
     this.stats = new StatsRepository(this.db)
@@ -111,6 +115,12 @@ export class DatabaseManager {
   getAfkTimeForDay(date: string): number { return this.events.getAfkTimeForDay(date) }
   getDayCoverage(date: string): DayCoverage { return this.events.getDayCoverage(date) }
   updateEventProgress(id: number, tsEnd: string, duration: number): void { this.events.updateEventProgress(id, tsEnd, duration) }
+
+  // MeetingRepository
+  startMeeting(tsStart: string, url: string | null, title: string | null): number { return this.meetings.startMeeting(tsStart, url, title) }
+  extendMeeting(id: number, tsEnd: string): void { this.meetings.extendMeeting(id, tsEnd) }
+  closeMeeting(id: number, tsEnd: string): void { this.meetings.closeMeeting(id, tsEnd) }
+  getMeetingsByDay(date: string): Meeting[] { return this.meetings.getMeetingsByDay(date) }
 
   // CategoryRepository
   getAllCategories(): Category[] { return this.categories.getAllCategories() }

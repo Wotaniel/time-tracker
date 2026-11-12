@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Component, type ReactNode } from 'react'
 import { Clock, Activity, BarChart3, Settings as SettingsIcon, ChevronRight, MoreVertical, Briefcase, AlertTriangle } from 'lucide-react'
-import type { CurrentActivity, DayCoverage, DetailedDaySummary, WindowEntry, AppTag, TagType, TagTargetType, TrackingHealthStatus } from '../../shared/types'
+import type { CurrentActivity, DayCoverage, DetailedDaySummary, Meeting, WindowEntry, AppTag, TagType, TagTargetType, TrackingHealthStatus } from '../../shared/types'
 import { formatDuration, formatLocalDate } from './lib/format'
 import StatsView from './pages/StatsView'
 import SettingsView from './pages/SettingsView'
@@ -260,13 +260,20 @@ function DaySummaryView({
   const { tags, setTag, deleteTag } = useAppTags()
   const [afkTime, setAfkTime] = useState(0)
   const [coverage, setCoverage] = useState<DayCoverage | null>(null)
+  const [meetings, setMeetings] = useState<Meeting[]>([])
 
   useEffect(() => {
     window.api.activities.getAfkTime(selectedDate).then((secs: number) => {
       setAfkTime(secs)
     })
     window.api.activities.getDayCoverage(selectedDate).then(setCoverage)
+    window.api.meetings.getDay(selectedDate).then(setMeetings)
   }, [selectedDate])
+
+  const meetingTime = meetings.reduce((sum, m) => {
+    const end = m.tsEnd ? new Date(m.tsEnd).getTime() : Date.now()
+    return sum + Math.max(0, Math.round((end - new Date(m.tsStart).getTime()) / 1000))
+  }, 0)
 
   // Date navigation
   const shiftDate = (days: number): void => {
@@ -319,6 +326,12 @@ function DaySummaryView({
             <span>
               Всего от первого события: <span className="text-tt-text">{formatDuration(coverage.span)}</span>
             </span>
+            {meetingTime > 0 && (
+              <span title="Созвоны идут параллельно с работой и входят в активность, а не прибавляются к ней">
+                В созвонах: <span className="text-tt-purple">{formatDuration(meetingTime)}</span>
+                <span className="text-tt-muted"> (входит в активность)</span>
+              </span>
+            )}
           </div>
         )}
       </div>

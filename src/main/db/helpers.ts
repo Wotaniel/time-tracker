@@ -30,6 +30,14 @@ export interface RawEventRow {
   is_private: number
 }
 
+export interface RawMeetingRow {
+  id: number
+  ts_start: string
+  ts_end: string | null
+  url: string | null
+  title: string | null
+}
+
 export interface RawCategoryRow {
   id: number
   name: string
