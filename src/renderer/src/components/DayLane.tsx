@@ -3,6 +3,7 @@ import type { ActivityEvent, Meeting, TagType } from '../../../shared/types'
 import { formatDuration, formatLocalDate, formatTimeSec } from '../lib/format'
 import { tagColor } from '../lib/tags'
 import { METRIC } from '../lib/colors'
+import type { SunTimes } from '../../../shared/sun'
 
 /**
  * Лента дня: три дорожки, масштаб и подробности.
@@ -18,6 +19,8 @@ interface DayLaneProps {
   date: string
   tagFor: (appName: string, url: string | null) => TagType | undefined
   categoryFor: (categoryId: number | null | undefined) => string | null
+  /** Рассвет и закат для выбранной даты; null — координаты не заданы */
+  sun?: SunTimes | null
 }
 
 interface HoverInfo {
@@ -53,7 +56,8 @@ export function DayLane({
   meetings,
   date,
   tagFor,
-  categoryFor
+  categoryFor,
+  sun = null
 }: DayLaneProps): JSX.Element {
   const [hover, setHover] = useState<HoverInfo | null>(null)
   // Масштаб — доля суток: колесо мыши сужает окно вокруг курсора
@@ -185,7 +189,9 @@ export function DayLane({
     })
   }
 
-  const hourStep = viewMs <= 6 * HOUR_MS ? 1 : viewMs <= 12 * HOUR_MS ? 2 : 3
+  // Подпись на каждый час: 24 подписи помещаются на ширине ленты (проверено),
+  // а при сильном приближении в окне остаётся один-два часа
+  const hourStep = 1
   const hoursInView = Array.from({ length: 24 }, (_, h) => h).filter((h) => {
     const at = dayStart + h * HOUR_MS
     return at >= start - HOUR_MS / 2 && at <= end + HOUR_MS / 2 && h % hourStep === 0
@@ -400,6 +406,28 @@ export function DayLane({
           })}
         </div>
 
+        {/* Рассвет и закат: вертикальные засечки с подписью в шкале */}
+        {sun &&
+          (
+            [
+              ['рассвет', sun.sunrise, METRIC.uncovered],
+              ['закат', sun.sunset, METRIC.distracting]
+            ] as const
+          ).map(([label, at, color]) =>
+            at !== null && at >= start && at <= end ? (
+              <div
+                key={label}
+                className="pointer-events-none absolute top-0 bottom-0 z-20 w-px opacity-70"
+                style={{
+                  left: `${((at - start) / viewMs) * 100}%`,
+                  backgroundColor: color,
+                  borderLeft: `1px dashed ${color}`
+                }}
+                title={`${label} — ${formatTimeSec(new Date(at).toISOString())}`}
+              />
+            ) : null
+          )}
+
         {/* Метка «сейчас» поверх дорожек и шкалы */}
         {isToday && now >= start && now <= end && (
           <div
@@ -429,7 +457,8 @@ export function DayLane({
             ['отвлечение', METRIC.distracting],
             ['созвоны', METRIC.meeting],
             ['AFK', METRIC.afk],
-            ['не записано', METRIC.uncovered]
+            ['не записано', METRIC.uncovered],
+            ['рассвет/закат', METRIC.uncovered]
           ] as const
         ).map(([label, color]) => (
           <span key={label} className="flex items-center gap-1">
