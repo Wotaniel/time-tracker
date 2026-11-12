@@ -118,6 +118,16 @@ export interface TaskStat {
   apps: string[]
 }
 
+/**
+ * Время, у которого нет категории: приложение или домен без тега.
+ * Это очередь разбора — время есть, но неизвестно, работа это или отвлечение.
+ */
+export interface UntaggedEntry {
+  targetType: TagTargetType
+  targetKey: string
+  seconds: number
+}
+
 /** Детальная сводка за день: appName с разбивкой по окнам/вкладкам */
 export interface DetailedDaySummary {  appName: string
   appBundleId?: string | null
@@ -171,6 +181,7 @@ export const IPC_CHANNELS = {
   STATS_GET_TASKS: 'stats:getTasks',
   ACTIVITIES_GET_AFK_TIME: 'activities:getAfkTime',
   ACTIVITIES_GET_DAY_COVERAGE: 'activities:getDayCoverage',
+  ACTIVITIES_GET_UNTAGGED: 'activities:getUntagged',
   MEETINGS_GET_DAY: 'meetings:getDay',
   MEETINGS_GET_RANGE: 'meetings:getRange',
   CATEGORIES_GET_ALL: 'categories:getAll',
@@ -212,6 +223,7 @@ export interface TimeTrackerApi {
     getSummaryDetailed: (date: string) => Promise<DetailedDaySummary[]>
     getAfkTime: (date: string) => Promise<number>
     getDayCoverage: (date: string) => Promise<DayCoverage>
+    getUntagged: (date: string) => Promise<UntaggedEntry[]>
   }
   meetings: {
     getDay: (date: string) => Promise<Meeting[]>

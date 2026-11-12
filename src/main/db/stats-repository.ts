@@ -17,7 +17,8 @@ import type {
   TagType,
   WorkAppStat,
   TaskStat,
-  TagTargetType
+  TagTargetType,
+  UntaggedEntry
 } from '../../shared/types'
 import {
   localDayBounds,
@@ -128,6 +129,51 @@ export class StatsRepository {
       })
     }
     return result
+  }
+
+  /**
+   * Время без тега: приложения и домены, для которых нет записи в app_tags.
+   *
+   * Зачем: «не записано» и «без тега» — разные вещи. Первое значит, что
+   * приложение не работало, второе — что время есть, но неизвестно, работа
+   * это или отвлечение. Без такой очереди эти часы некуда деть.
+   */
+  getUntagged(date: string): UntaggedEntry[] {
+    const { start, end } = localDayBounds(date)
+    const rows = this.db
+      .prepare(`
+        SELECT targetType, targetKey, SUM(seconds) AS seconds FROM (
+          SELECT 'app' AS targetType, e.app_name AS targetKey, SUM(e.duration) AS seconds
+          FROM events e
+          WHERE e.ts_start >= ? AND e.ts_start <= ? AND e.is_afk = 0
+            AND NOT EXISTS (
+              SELECT 1 FROM app_tags t
+              WHERE t.target_type = 'app' AND t.target_key = e.app_name
+            )
+          GROUP BY e.app_name
+
+          UNION ALL
+
+          SELECT 'domain' AS targetType,
+                 extractDomainFromUrl(e.url) AS targetKey,
+                 SUM(e.duration) AS seconds
+          FROM events e
+          WHERE e.ts_start >= ? AND e.ts_start <= ? AND e.is_afk = 0
+            AND e.url IS NOT NULL AND e.url != ''
+            AND extractDomainFromUrl(e.url) IS NOT NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM app_tags t
+              WHERE t.target_type = 'domain' AND t.target_key = extractDomainFromUrl(e.url)
+            )
+          GROUP BY 2
+        )
+        GROUP BY targetType, targetKey
+        HAVING SUM(seconds) >= 10
+        ORDER BY seconds DESC
+      `)
+      .all(start, end, start, end) as { targetType: TagTargetType; targetKey: string; seconds: number }[]
+
+    return rows.map((r) => ({ targetType: r.targetType, targetKey: r.targetKey, seconds: r.seconds }))
   }
 
   /**
