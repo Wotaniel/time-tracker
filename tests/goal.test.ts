@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { reachedTier, weeklyGoalTiers } from '../src/shared/goal'
+import { dailyGoalTiers, reachedDailyTier, reachedTier, weeklyGoalTiers } from '../src/shared/goal'
 
 const H = 3600
 
@@ -18,5 +18,23 @@ describe('уровни недельной цели', () => {
 
   it('без цели уровней нет', () => {
     expect(reachedTier(40 * H, 0)).toBeNull()
+  })
+})
+
+describe('дневные уровни', () => {
+  it('при норме 6 это 6 / 7 / 8', () => {
+    expect(dailyGoalTiers(6 * H).map((t) => t.seconds / H)).toEqual([6, 7, 8])
+    expect(dailyGoalTiers(6 * H).map((t) => t.label)).toEqual(['норм', 'круто', 'перебор'])
+  })
+
+  it('выдаёт высший достигнутый уровень', () => {
+    expect(reachedDailyTier(5 * H, 6 * H)).toBeNull()
+    expect(reachedDailyTier(6 * H, 6 * H)?.tier).toBe('fine')
+    expect(reachedDailyTier(7.5 * H, 6 * H)?.tier).toBe('cool')
+    expect(reachedDailyTier(9 * H, 6 * H)?.tier).toBe('over')
+  })
+
+  it('без нормы уровней нет', () => {
+    expect(reachedDailyTier(8 * H, 0)).toBeNull()
   })
 })
