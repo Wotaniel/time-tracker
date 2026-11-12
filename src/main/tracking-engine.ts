@@ -1,10 +1,10 @@
-import activeWin from 'active-win'
 import { EventEmitter } from 'events'
 import { app, systemPreferences } from 'electron'
 import type { DatabaseManager } from './database'
 import type { CurrentActivity } from '../shared/types'
 import { log } from './safe-log'
-import { detectMeeting } from './meeting-detect'
+import { detectMeeting, detectMeetingAmong, type DetectedMeeting } from './meeting-detect'
+import { getActiveWindow, getOpenWindows, type WindowInfo } from './active-window'
 
 /** Имена процесса трекера в dev-режиме — active-win может отдать 'Electron' */
 const SELF_APP_NAMES = new Set(['Electron'])
@@ -17,7 +17,7 @@ const SELF_APP_NAMES = new Set(['Electron'])
  * уже после импортов), поэтому окно трекера попадало в статистику как реальная
  * работа. PID главного процесса от порядка инициализации не зависит.
  */
-function isSelfActivity(win: NonNullable<Awaited<ReturnType<typeof activeWin>>>): boolean {
+function isSelfActivity(win: WindowInfo): boolean {
   if (win.owner.processId === process.pid) return true
   const appName = win.owner.name
   return SELF_APP_NAMES.has(appName) || appName === app.getName()
@@ -85,7 +85,13 @@ export class TrackingEngine extends EventEmitter {
   private meetingLastSeen: number = 0  // Date.now() последнего наблюдения Meet
   private meetingId: number | null = null  // запись в meetings, пока созвон идёт
   private lastMeetingWrite: number = 0
-  private readonly MEETING_TIMEOUT_MS = 10 * 60 * 1000 // 10 мин без Meet → созвон окончен
+  private meetingSource: DetectedMeeting['source'] | null = null
+  private lastMeetingScan: number = 0
+  private readonly MEETING_TIMEOUT_MS = 10 * 60 * 1000 // страховка: 10 мин без признаков
+  /** Окно созвона пропало → он закончился. Хаддл/Zoom/Teams видны в списке окон */
+  private readonly MEETING_GONE_MS = 45_000
+  /** Как часто смотрим список открытых окон */
+  private readonly MEETING_SCAN_MS = 5_000
 
   constructor(db: DatabaseManager) {
     super()
@@ -263,11 +269,22 @@ export class TrackingEngine extends EventEmitter {
     win: { appName: string; windowTitle: string; url: string | null },
     now: number
   ): void {
-    const detected = detectMeeting(win)
+    this.applyMeeting(detectMeeting(win), now)
+  }
 
+  /**
+   * Обновляет состояние созвона по результату опроса.
+   *
+   * Закрываем по-разному: окно Slack/Zoom/Teams видно в списке окон всё время,
+   * поэтому его исчезновение — надёжный признак конца. У Meet окно — обычная
+   * вкладка браузера, её в списке с URL не видно, поэтому для него живёт
+   * старая страховка в 10 минут.
+   */
+  private applyMeeting(detected: DetectedMeeting | null, now: number): void {
     if (detected) {
       if (!this.meetingActive) {
         this.meetingActive = true
+        this.meetingSource = detected.source
         this.meetingId = this.db.startMeeting(
           new Date(now).toISOString(),
           detected.url,
@@ -283,15 +300,40 @@ export class TrackingEngine extends EventEmitter {
 
     if (!this.meetingActive) return
 
-    if (now - this.meetingLastSeen > this.MEETING_TIMEOUT_MS) {
+    const grace =
+      this.meetingSource === 'Google Meet' ? this.MEETING_TIMEOUT_MS : this.MEETING_GONE_MS
+
+    if (now - this.meetingLastSeen > grace) {
       this.meetingActive = false
-      this.closeMeetingInterval(now)
-      log.info('[TrackingEngine] Meeting ended (timeout)')
+      this.meetingSource = null
+      // Конец — момент, когда созвон видели последний раз, а не сейчас
+      this.closeMeetingInterval(this.meetingLastSeen)
+      log.info('[TrackingEngine] Meeting ended')
       return
     }
 
-    // Вкладка не в фокусе, но созвон идёт — интервал продолжается
     this.flushMeeting(now)
+  }
+
+  /** Раз в 5 секунд смотрим все открытые окна: созвон в фоне тоже надо видеть */
+  private async scanMeetings(): Promise<void> {
+    const now = Date.now()
+    if (now - this.lastMeetingScan < this.MEETING_SCAN_MS) return
+    this.lastMeetingScan = now
+
+    try {
+      const windows = await getOpenWindows()
+      const detected = detectMeetingAmong(
+        windows.map((w) => ({
+          appName: w.owner?.name ?? '',
+          windowTitle: w.title ?? '',
+          url: w.url ?? null
+        }))
+      )
+      this.applyMeeting(detected, Date.now())
+    } catch (err) {
+      log.warn('[TrackingEngine] open windows scan failed:', err)
+    }
   }
 
   /** Продлевает интервал созвона не чаще раза в PROGRESS_INTERVAL_MS */
@@ -356,9 +398,9 @@ export class TrackingEngine extends EventEmitter {
       // the macOS permission dialog.
       if (!this.checkAccessibilityPermission()) return
 
-      let win: Awaited<ReturnType<typeof activeWin>>
+      let win: WindowInfo | undefined
       try {
-        win = await activeWin()
+        win = await getActiveWindow()
         this.activeWinFailures = 0
         this.reportWindowAccess(true)
       } catch (err) {
@@ -396,6 +438,7 @@ export class TrackingEngine extends EventEmitter {
 
       // Созвон (Meet / Zoom / Teams / Slack huddle) — состояние обновляем до обычного трекинга
       this.updateMeetingTracking({ appName, windowTitle, url }, Date.now())
+      void this.scanMeetings()
 
       // Locked screen / screensaver — not real activity, don't record.
       // This catches cases where lock-screen event hasn't fired yet (race),

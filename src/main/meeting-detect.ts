@@ -54,6 +54,21 @@ function isTeamsMeeting(appName: string, title: string): boolean {
   return /(meeting|встреч)/i.test(title)
 }
 
+/**
+ * Созвон среди списка открытых окон.
+ *
+ * Зачем: хаддл, Zoom или Teams живут отдельным окном. Пока мы смотрели только
+ * активное, звонок «пропадал», стоило переключиться в Figma. Окно же видно
+ * всё время: появилось — начали, закрылось (нажали «завершить») — закончили.
+ */
+export function detectMeetingAmong(windows: WindowInfo[]): DetectedMeeting | null {
+  for (const win of windows) {
+    const detected = detectMeeting(win)
+    if (detected) return detected
+  }
+  return null
+}
+
 export function detectMeeting(win: WindowInfo): DetectedMeeting | null {
   const code = meetCode(win.url)
   if (code) {
