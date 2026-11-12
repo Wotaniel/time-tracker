@@ -34,7 +34,8 @@ import type {
   TagStat,
   WorkAppStat,
   TaskStat,
-  Meeting
+  Meeting,
+  UntaggedEntry
 } from '../shared/types'
 import { runMigrations } from './db/migrations'
 import { EventRepository } from './db/event-repository'
@@ -114,6 +115,7 @@ export class DatabaseManager {
   getDaySummaryDetailed(date: string): DetailedDaySummary[] { return this.events.getDaySummaryDetailed(date) }
   getAfkTimeForDay(date: string): number { return this.events.getAfkTimeForDay(date) }
   getDayCoverage(date: string): DayCoverage { return this.events.getDayCoverage(date) }
+  getUntagged(date: string): UntaggedEntry[] { return this.stats.getUntagged(date) }
   updateEventProgress(id: number, tsEnd: string, duration: number): void { this.events.updateEventProgress(id, tsEnd, duration) }
 
   // MeetingRepository

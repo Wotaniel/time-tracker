@@ -8,6 +8,7 @@ import type {
   TagTargetType,
   TagType,
   TaskStat,
+  UntaggedEntry,
   WindowEntry
 } from '../../../shared/types'
 import { formatDuration, formatLocalDate } from '../lib/format'
@@ -35,21 +36,24 @@ export function TodayView(): JSX.Element {
   const [showEvents, setShowEvents] = useState(false)
   const [showTasks, setShowTasks] = useState(false)
   const [tasks, setTasks] = useState<TaskStat[]>([])
+  const [untagged, setUntagged] = useState<UntaggedEntry[]>([])
   const { tags, setTag, deleteTag } = useAppTags()
 
   // Всё, что показывает день, обновляется вместе: раньше созвоны и покрытие
   // запрашивались один раз при открытии и не появлялись, пока не сменишь дату.
   const load = useCallback(async () => {
-    const [sum, ev, cov, meet] = await Promise.all([
+    const [sum, ev, cov, meet, unt] = await Promise.all([
       window.api.activities.getSummaryDetailed(selectedDate),
       window.api.activities.getDay(selectedDate),
       window.api.activities.getDayCoverage(selectedDate),
-      window.api.meetings.getDay(selectedDate)
+      window.api.meetings.getDay(selectedDate),
+      window.api.activities.getUntagged(selectedDate)
     ])
     setSummary(sum)
     setEvents(ev)
     setCoverage(cov)
     setMeetings(meet)
+    setUntagged(unt)
   }, [selectedDate])
 
   useEffect(() => {
@@ -89,6 +93,12 @@ export function TodayView(): JSX.Element {
 
   const visible = filter === 'work' ? workApps : summary
   const maxTime = visible[0]?.totalTime ?? 1
+
+  // Браузер как приложение не показываем: его время уже разложено по доменам
+  const untaggedRows = untagged.filter(
+    (row) => row.targetType === 'domain' || !isBrowser(row.targetKey)
+  )
+  const untaggedTotal = untaggedRows.reduce((sum, row) => sum + row.seconds, 0)
 
   const today = formatLocalDate(new Date())
   const shiftDate = (days: number): void => {
@@ -164,6 +174,61 @@ export function TodayView(): JSX.Element {
       {/* ─── Слой 2: лента дня ──────────────────────────────── */}
       <section className="rounded-lg border border-tt-border bg-tt-surface p-5">
         <DayLane events={events} meetings={meetings} date={selectedDate} tagFor={tagFor} />
+      </section>
+
+      {/* ─── Слой «без тега»: время есть, категории нет ──────── */}
+      <section className="rounded-lg border border-tt-border bg-tt-surface">
+        <div className="flex items-baseline justify-between px-4 py-2.5">
+          <h2 className="text-xs font-medium uppercase tracking-wide text-tt-muted">Без тега</h2>
+          <span className="text-[11px] text-tt-muted">
+            {untaggedRows.length === 0
+              ? 'очередь пуста'
+              : `${untaggedRows.length} · ${formatDuration(untaggedTotal)}`}
+          </span>
+        </div>
+        {untaggedRows.length === 0 ? (
+          <p className="border-t border-tt-border px-4 py-3 text-xs text-tt-muted">
+            Всё размечено: за этот день не осталось времени без категории.
+          </p>
+        ) : (
+          <div className="border-t border-tt-border">
+            <p className="px-4 pt-2 text-[11px] text-tt-muted">
+              Время есть, но неизвестно, работа это или отвлечение. Тег применится к приложению
+              или домену целиком — сразу и на будущее.
+            </p>
+            <div className="divide-y divide-tt-border/50">
+              {untaggedRows.map((row) => {
+                const key = `${row.targetType}:${row.targetKey}`
+                return (
+                  <div key={key} className="flex items-center gap-3 px-4 py-1.5 text-xs">
+                    <span
+                      className="w-16 shrink-0 text-[10px] uppercase tracking-wide text-tt-muted"
+                      title={row.targetType === 'domain' ? 'домен' : 'приложение'}
+                    >
+                      {row.targetType === 'domain' ? 'домен' : 'прил.'}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{row.targetKey}</span>
+                    {tags.get(key) && <TagBadge tag={tags.get(key)!} />}
+                    <span className="w-16 text-right tabular-nums text-tt-muted">
+                      {formatDuration(row.seconds)}
+                    </span>
+                    <TagMenu
+                      currentTag={tags.get(key)}
+                      onSelect={async (tag) => {
+                        await setTag(row.targetType, row.targetKey, tag)
+                        void load()
+                      }}
+                      onClear={async () => {
+                        await deleteTag(row.targetType, row.targetKey)
+                        void load()
+                      }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ─── Слой 4: приложения ─────────────────────────────── */}

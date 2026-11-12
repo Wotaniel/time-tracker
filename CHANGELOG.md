@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **«Без тега» — очередь разбора вместо невидимых часов** — new `activities:getUntagged` returns apps and domains that have no tag for the day, with time. «Не записано» and «без тега» are different things: the first means the app was not running, the second means the time exists but its category is unknown. The queue sits above the app list (action before passive reading) and every row carries a tag menu, so a domain can be classified once — for the past and the future
+
 ### Changed
 - **«Неделя» replaces the old stats screen** — a week is a different question than a day, so it gets a different composition: four KPIs with a delta to the previous week (activity, work, distractions, meetings), a stacked bar chart by day with a legend, top apps, and the heatmap moved behind a toggle. When the previous week has no data the cards show «—» and one line explains why, instead of repeating «нет базы для сравнения» four times. Meetings now have a range query (`meetings:getRange`) so the call KPI works for a period
 - **UI hierarchy rebuild, stage 1** — «Сегодня» no longer shows the same day three times at equal weight. New structure: one hero metric (activity + work / meetings / AFK / not recorded), a three-lane day strip (activity, meetings, idle gaps) with an hour scale, a «сейчас» marker and a legend, then the app list; raw events moved behind a button, and the duplicate total card is gone. Navigation is three labelled sections (Сегодня / Неделя / Настройки) instead of four unlabelled icons; «Работа» stopped being a separate screen — it is a «только работа» filter plus a Jira tasks section inside «Сегодня». App colours are now semantic (work / neutral / distracting) instead of a hash palette that meant nothing

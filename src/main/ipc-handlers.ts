@@ -69,6 +69,11 @@ export function registerIpcHandlers(
     return db.getDayCoverage(date)
   })
 
+  ipcMain.handle(IPC_CHANNELS.ACTIVITIES_GET_UNTAGGED, (_event, date: string) => {
+    validateDate(date)
+    return db.getUntagged(date)
+  })
+
   ipcMain.handle(IPC_CHANNELS.MEETINGS_GET_DAY, (_event, date: string) => {
     validateDate(date)
     return db.getMeetingsByDay(date)

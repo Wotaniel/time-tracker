@@ -23,7 +23,8 @@ const api = {
     getSummary: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.ACTIVITIES_GET_SUMMARY, date),
     getSummaryDetailed: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.ACTIVITIES_GET_SUMMARY_DETAILED, date),
     getAfkTime: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.ACTIVITIES_GET_AFK_TIME, date),
-    getDayCoverage: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.ACTIVITIES_GET_DAY_COVERAGE, date)
+    getDayCoverage: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.ACTIVITIES_GET_DAY_COVERAGE, date),
+    getUntagged: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.ACTIVITIES_GET_UNTAGGED, date)
   },
   meetings: {
     getDay: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.MEETINGS_GET_DAY, date),
