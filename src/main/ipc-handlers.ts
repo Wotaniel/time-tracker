@@ -5,6 +5,7 @@ import { homedir } from 'os'
 import type { DatabaseManager } from './database'
 import type { TrackingEngine } from './tracking-engine'
 import type { AFKDetector } from './afk-detector'
+import type { TrackingHealth } from './tracking-health'
 import { getAppIcon } from './app-icons'
 import { IPC_CHANNELS, type Category, type CategoryRule, type TagTargetType, type TagType } from '../shared/types'
 
@@ -15,7 +16,12 @@ import { IPC_CHANNELS, type Category, type CategoryRule, type TagTargetType, typ
  * Важно: данные приходят из renderer (недоверенный контекст),
  * поэтому валидируем на стороне main.
  */
-export function registerIpcHandlers(db: DatabaseManager, tracker: TrackingEngine, afkDetector: AFKDetector): void {
+export function registerIpcHandlers(
+  db: DatabaseManager,
+  tracker: TrackingEngine,
+  afkDetector: AFKDetector,
+  trackingHealth: TrackingHealth
+): void {
   // ─── Tracking ────────────────────────────────────────────
 
   ipcMain.handle(IPC_CHANNELS.TRACKING_GET_CURRENT, () => {
@@ -298,6 +304,16 @@ export function registerIpcHandlers(db: DatabaseManager, tracker: TrackingEngine
       db.deleteAppTag(targetType, targetKey)
     }
   )
+
+  // ─── Tracking health ─────────────────────────────────────
+
+  ipcMain.handle(IPC_CHANNELS.HEALTH_GET_STATUS, () => {
+    return trackingHealth.getStatus()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.HEALTH_OPEN_ACCESSIBILITY_SETTINGS, () => {
+    trackingHealth.openAccessibilitySettings()
+  })
 }
 
 // ─── Validation helpers ────────────────────────────────────────

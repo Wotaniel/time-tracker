@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Component, type ReactNode } from 'react'
-import { Clock, Activity, BarChart3, Settings as SettingsIcon, ChevronRight, MoreVertical, Briefcase } from 'lucide-react'
-import type { CurrentActivity, DetailedDaySummary, WindowEntry, AppTag, TagType, TagTargetType } from '../../shared/types'
+import { Clock, Activity, BarChart3, Settings as SettingsIcon, ChevronRight, MoreVertical, Briefcase, AlertTriangle } from 'lucide-react'
+import type { CurrentActivity, DetailedDaySummary, WindowEntry, AppTag, TagType, TagTargetType, TrackingHealthStatus } from '../../shared/types'
 import { formatDuration, formatLocalDate } from './lib/format'
 import StatsView from './pages/StatsView'
 import SettingsView from './pages/SettingsView'
@@ -65,6 +65,18 @@ function AppInner(): JSX.Element {
   const [currentActivity, setCurrentActivity] = useState<CurrentActivity | null>(null)
   const [summary, setSummary] = useState<DetailedDaySummary[]>([])
   const [selectedDate, setSelectedDate] = useState(() => formatLocalDate(new Date()))
+  const [health, setHealth] = useState<TrackingHealthStatus | null>(null)
+
+  // Почему трекер не пишет: без этого состояния поломка выглядит как работающее
+  // приложение с пустой лентой. Состояние приходит из main и обновляется само.
+  useEffect(() => {
+    window.api.health
+      .getStatus()
+      .then(setHealth)
+      .catch(() => setHealth(null))
+
+    return window.api.health.onChanged(setHealth)
+  }, [])
 
   // Listen for real-time activity changes from main process
   useEffect(() => {
@@ -157,6 +169,7 @@ function AppInner(): JSX.Element {
         </header>
 
         <div className="p-6">
+          {health && !health.tracking && <BlockedBanner health={health} />}
           {view === 'timeline' && (
             <>
               <DaySummaryView
@@ -176,6 +189,58 @@ function AppInner(): JSX.Element {
           {view === 'settings' && <SettingsView />}
         </div>
       </main>
+    </div>
+  )
+}
+
+// ─── Blocked banner ────────────────────────────────────────────
+
+/**
+ * Почему трекер не пишет. Две причины выглядят одинаково — пустая лента, —
+ * поэтому текст должен называть именно ту, что случилась.
+ */
+function BlockedBanner({ health }: { health: TrackingHealthStatus }): JSX.Element {
+  if (health.blockedBy === 'bundle-integrity') {
+    return (
+      <div className="mb-4 flex items-start gap-3 rounded-lg border border-tt-red/40 bg-tt-red/10 p-4">
+        <AlertTriangle size={18} className="mt-0.5 shrink-0 text-tt-red" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">Подпись приложения повреждена — трекинг не работает</p>
+          <p className="mt-1 text-xs text-tt-muted">
+            macOS не сопоставит приложение с записью о разрешении, поэтому «Универсальный доступ»
+            из Системных настроек не применяется. Обычно причина в том, что приложение запущено
+            из папки под iCloud Drive: синхронизация возвращает на бандл
+            посторонние атрибуты и ломает подпись.
+          </p>
+          <p className="mt-1 text-xs text-tt-muted">
+            Запускайте копию из /Applications: <code>npm run install:mac</code> собирает её и ставит
+            на место.
+          </p>
+          {health.bundlePath && (
+            <p className="mt-1 truncate text-xs text-tt-muted">Сейчас запущено из {health.bundlePath}</p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mb-4 flex items-start gap-3 rounded-lg border border-tt-yellow/40 bg-tt-yellow/10 p-4">
+      <AlertTriangle size={18} className="mt-0.5 shrink-0 text-tt-yellow" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">Трекинг не работает: нет разрешения «Универсальный доступ»</p>
+        <p className="mt-1 text-xs text-tt-muted">
+          Без него macOS не отдаёт активное окно, поэтому в базу не пишется ни одного события.
+          Включите CarpeDiem в Системных настройках → Конфиденциальность и безопасность →
+          Универсальный доступ. Разрешение подхватится само, перезапускать приложение не нужно.
+        </p>
+      </div>
+      <button
+        className="no-drag shrink-0 rounded-md border border-tt-border px-3 py-1.5 text-xs hover:bg-tt-surface"
+        onClick={() => window.api.health.openAccessibilitySettings()}
+      >
+        Открыть настройки
+      </button>
     </div>
   )
 }

@@ -1,17 +1,20 @@
-import { app, BrowserWindow, shell, Tray, Menu, nativeImage, systemPreferences } from 'electron'
+import { app, BrowserWindow, shell, Tray, Menu, nativeImage } from 'electron'
 import { join } from 'path'
 import { DatabaseManager } from './database'
 import { TrackingEngine } from './tracking-engine'
 import { AFKDetector } from './afk-detector'
+import { TrackingHealth } from './tracking-health'
 import { registerIpcHandlers } from './ipc-handlers'
 import { formatLocalDate } from './database'
 import { installGlobalErrorHandlers, log } from './safe-log'
+import { IPC_CHANNELS } from '../shared/types'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let db: DatabaseManager | null = null
 let tracker: TrackingEngine | null = null
 let afkDetector: AFKDetector | null = null
+let trackingHealth: TrackingHealth | null = null
 let isQuitting = false
 
 // Set app name before ready — affects macOS menu bar, active-win results, tray
@@ -120,9 +123,31 @@ function updateTrayMenu(): void {
   // Top 3 apps for quick summary
   const top3 = summary.slice(0, 3)
 
+  // Без разрешения Accessibility трекер не пишет данные — говорим об этом прямо в меню,
+  // иначе приложение выглядит работающим, а лента остаётся пустой.
+  const health = trackingHealth?.getStatus()
+  const healthWarning: Electron.MenuItemConstructorOptions[] =
+    health && !health.tracking
+      ? health.blockedBy === 'bundle-integrity'
+        ? [
+            { label: '⚠️ Подпись приложения повреждена — трекинг не работает', enabled: false },
+            { label: '   запускайте копию из /Applications', enabled: false },
+            { type: 'separator' }
+          ]
+        : [
+            { label: '⚠️ Трекинг не работает: нет разрешения Accessibility', enabled: false },
+            {
+              label: 'Открыть Универсальный доступ…',
+              click: (): void => trackingHealth?.openAccessibilitySettings()
+            },
+            { type: 'separator' }
+          ]
+      : []
+
   const template: Electron.MenuItemConstructorOptions[] = [
     { label: `CarpeDiem — ${formatTrayDuration(totalActive)} today`, enabled: false },
     { type: 'separator' },
+    ...healthWarning,
     {
       label: current.isPaused
         ? '⏸ Tracking paused'
@@ -184,7 +209,11 @@ function updateTrayMenu(): void {
   )
 
   tray.setContextMenu(Menu.buildFromTemplate(template))
-  tray.setToolTip(`CarpeDiem — ${formatTrayDuration(totalActive)} today`)
+  tray.setToolTip(
+    health && !health.tracking
+      ? 'CarpeDiem — трекинг не работает, причина в меню'
+      : `CarpeDiem — ${formatTrayDuration(totalActive)} today`
+  )
 }
 
 // ─── App lifecycle ─────────────────────────────────────────────
@@ -216,32 +245,19 @@ app.whenReady().then(() => {
   // Initialize tracking engine
   tracker = new TrackingEngine(db)
 
-  // ─── Accessibility permission gate ─────────────────────────
-  // On macOS, active-win uses Accessibility API. Without permission,
-  // every poll() spawns a native binary that triggers the system dialog.
-  // We request permission ONCE, then wait until granted before starting.
-  if (process.platform === 'darwin') {
-    const hasPermission = systemPreferences.isTrustedAccessibilityClient(false)
-    if (hasPermission) {
-      log.info('[Main] Accessibility permission already granted — starting tracker')
-      tracker.start()
-    } else {
-      // Show the system dialog exactly ONCE (prompt=true)
-      log.info('[Main] Requesting Accessibility permission (one-time prompt)')
-      systemPreferences.isTrustedAccessibilityClient(true)
-
-      // Poll without prompting — wait for user to grant permission in System Settings
-      const permCheckId = setInterval(() => {
-        if (systemPreferences.isTrustedAccessibilityClient(false)) {
-          log.info('[Main] Accessibility permission granted — starting tracker')
-          tracker?.start()
-          clearInterval(permCheckId)
-        }
-      }, 2000)
-    }
-  } else {
-    tracker.start()
-  }
+  // ─── Tracking health ───────────────────────────────────────
+  // On macOS, active-win uses Accessibility API. Without permission, every poll()
+  // spawns a native binary that triggers the system dialog — so we request it ONCE
+  // and wait until granted.
+  // Why a dedicated health module: waiting silently looks exactly like a working app
+  // with an empty timeline. It also detects a broken bundle signature — the case where
+  // macOS refuses to match the app with its TCC entry, so the permission never applies.
+  trackingHealth = new TrackingHealth()
+  trackingHealth.on('changed', () => {
+    updateTrayMenu()
+    mainWindow?.webContents.send(IPC_CHANNELS.HEALTH_CHANGED, trackingHealth?.getStatus())
+  })
+  trackingHealth.ensure(() => tracker?.start())
 
   // Initialize AFK detector — load threshold from DB settings
   const savedThreshold = db.getSetting('idleThreshold')
@@ -258,7 +274,7 @@ app.whenReady().then(() => {
   afkDetector.start()
 
   // IPC — real handlers
-  registerIpcHandlers(db, tracker, afkDetector)
+  registerIpcHandlers(db, tracker, afkDetector, trackingHealth)
 
   // Push activity changes to renderer
   tracker.on('activity-changed', () => {
@@ -300,6 +316,7 @@ app.on('before-quit', () => {
   // Закрываем текущее событие перед выходом
   tracker?.stop()
   afkDetector?.stop()
+  trackingHealth?.dispose()
   db?.close()
   log.info('[Main] Cleaned up')
 })

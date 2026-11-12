@@ -119,6 +119,22 @@ export interface HeatmapCell {
   seconds: number
 }
 
+/**
+ * Состояние трекинга: пишется ли он прямо сейчас и что мешает, если нет.
+ * Без этого состояния поломка выглядит как «работающее приложение с пустой лентой»,
+ * поэтому UI обязан показывать её явно.
+ */
+export type TrackingBlockReason = 'accessibility' | 'bundle-integrity'
+
+export interface TrackingHealthStatus {
+  /** Трекер пишет данные прямо сейчас */
+  tracking: boolean
+  /** Что мешает, если tracking=false */
+  blockedBy: TrackingBlockReason | null
+  /** Путь к бандлу — показываем, когда подпись не проходит проверку */
+  bundlePath: string | null
+}
+
 // IPC channel names — single source of truth
 export const IPC_CHANNELS = {
   ACTIVITIES_GET_DAY: 'activities:getDay',
@@ -148,7 +164,10 @@ export const IPC_CHANNELS = {
   APPS_GET_ICON: 'apps:getIcon',
   TAGS_GET_ALL: 'tags:getAll',
   TAGS_SET: 'tags:set',
-  TAGS_DELETE: 'tags:delete'
+  TAGS_DELETE: 'tags:delete',
+  HEALTH_GET_STATUS: 'health:getStatus',
+  HEALTH_OPEN_ACCESSIBILITY_SETTINGS: 'health:openAccessibilitySettings',
+  HEALTH_CHANGED: 'health:changed'
 } as const
 
 export type IpcChannel = typeof IPC_CHANNELS[keyof typeof IPC_CHANNELS]
@@ -201,5 +220,10 @@ export interface TimeTrackerApi {
     getAll: () => Promise<AppTag[]>
     set: (targetType: TagTargetType, targetKey: string, tag: TagType) => Promise<AppTag>
     delete: (targetType: TagTargetType, targetKey: string) => Promise<void>
+  }
+  health: {
+    getStatus: () => Promise<TrackingHealthStatus>
+    openAccessibilitySettings: () => Promise<void>
+    onChanged: (callback: (status: TrackingHealthStatus) => void) => () => void
   }
 }
