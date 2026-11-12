@@ -64,7 +64,7 @@ function sameCall(a, b) {
   const codeA = meetingCode(a.url)
   const codeB = meetingCode(b.url)
   if (codeA && codeB) return codeA === codeB
-  return (a.title ?? '') === (b.title ?? '')
+  return (a.source ?? '') === (b.source ?? '')
 }
 
 /**
@@ -148,7 +148,7 @@ function collect(db, date) {
 
   const meetings = db
     .prepare(`
-      SELECT ts_start AS start, ts_end AS end, url, title FROM meetings
+      SELECT ts_start AS start, ts_end AS end, url, source, title FROM meetings
       WHERE ts_start <= @end AND COALESCE(ts_end, ts_start) >= @start
       ORDER BY ts_start
     `)
@@ -194,6 +194,8 @@ function collect(db, date) {
     meetings: mergeMeetings(meetings).map((m) => ({
       start: m.start,
       end: m.end,
+      source: m.source,
+      title: m.title,
       minutes: Math.max(
         0,
         Math.round(((m.end ? new Date(m.end) : Date.now()) - new Date(m.start)) / 1000 / 60)
@@ -239,7 +241,8 @@ function toMarkdown(report) {
   if (report.meetings.length > 0) {
     lines.push('**Созвоны:**')
     for (const m of report.meetings) {
-      lines.push(`- ${m.minutes} мин`)
+      const label = m.title || m.source || 'созвон'
+      lines.push(`- ${m.minutes} мин — ${label}`)
     }
     lines.push('')
   }

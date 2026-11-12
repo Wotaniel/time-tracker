@@ -121,7 +121,7 @@ export class DatabaseManager {
   updateEventProgress(id: number, tsEnd: string, duration: number): void { this.events.updateEventProgress(id, tsEnd, duration) }
 
   // MeetingRepository
-  startMeeting(tsStart: string, url: string | null, title: string | null): number { return this.meetings.startMeeting(tsStart, url, title) }
+  startMeeting(tsStart: string, url: string | null, source: string | null, title: string | null): number { return this.meetings.startMeeting(tsStart, url, source, title) }
   extendMeeting(id: number, tsEnd: string): void { this.meetings.extendMeeting(id, tsEnd) }
   closeMeeting(id: number, tsEnd: string): void { this.meetings.closeMeeting(id, tsEnd) }
   getMeetingsByDay(date: string): Meeting[] { return this.meetings.getMeetingsByDay(date) }

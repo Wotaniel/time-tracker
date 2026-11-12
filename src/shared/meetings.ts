@@ -22,7 +22,7 @@ export function meetingCode(meeting: Meeting): string | null {
 
 export function meetingKey(meeting: Meeting): string {
   const code = meetingCode(meeting)
-  return `${meeting.title ?? ''}:${code ?? 'unknown'}`
+  return `${meeting.source ?? ''}:${code ?? 'unknown'}`
 }
 
 /**
@@ -37,7 +37,7 @@ export function sameCall(a: Meeting, b: Meeting): boolean {
   const codeA = meetingCode(a)
   const codeB = meetingCode(b)
   if (codeA && codeB) return codeA === codeB
-  return (a.title ?? '') === (b.title ?? '')
+  return (a.source ?? '') === (b.source ?? '')
 }
 
 /**
