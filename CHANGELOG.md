@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **A hole inside a call** — Meet lives in a browser tab, and the window list only exposes the title of the *active* tab, so while you work elsewhere there is simply no signal. The engine closed the interval after 10 minutes and reopened it later, leaving a 17-minute gap in the middle of a call. Tolerance raised to 20 minutes for Meet, and the same 20 minutes is used when merging intervals of one room: today's two calls now render as two continuous bars instead of three slivers with a hole
+
+### Fixed
 - **One call was drawn as several slivers** — the same Meet room arrives as `meet.google.com/cqu-vfcz-ftv` and `meet.google.com/meet/cqu-vfcz-ftv`, with `%40` or `@` in `authuser`, and intervals were compared by the raw URL string. Intervals are now merged by room code, and when one side has no link (Meet caught by tab title, Slack huddle) — by source. Gap tolerance raised to 10 minutes for the same room
 - **Meet disappeared while you worked elsewhere** — the open-window list has no URL for a browser, so a call was only visible in the focused window. A tab in a call is titled `Meet - <topic>`, while the home page is `Google Meet`, so the title is now used as a fallback signal
 
