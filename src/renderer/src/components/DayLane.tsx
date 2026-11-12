@@ -161,14 +161,6 @@ export function DayLane({ events, meetings, date, tagFor, categoryFor }: DayLane
               {...hoverProps(bar.hoverInfo)}
             />
           ))}
-
-          {/* Метка «сейчас» */}
-          {isToday && (
-            <div
-              className="pointer-events-none absolute inset-y-0 w-px bg-tt-text/70"
-              style={{ left: `${clamp(toPct(now - dayStart))}%` }}
-            />
-          )}
         </div>
 
         {/* Созвоны */}
@@ -233,13 +225,32 @@ export function DayLane({ events, meetings, date, tagFor, categoryFor }: DayLane
             ))}
           </div>
         )}
-      </div>
 
-      {/* Часы */}
-      <div className="mt-1 flex justify-between text-[10px] text-tt-muted">
-        {hourMarks.map((h) => (
-          <span key={h}>{h}</span>
-        ))}
+        {/* Часы внутри того же контейнера: линия «сейчас» должна заезжать и на них */}
+        <div className="mt-1 flex justify-between text-[10px] text-tt-muted">
+          {hourMarks.map((h) => (
+            <span key={h}>{h}</span>
+          ))}
+        </div>
+
+        {/* Метка «сейчас» поверх дорожек и шкалы: не обрезается контейнером */}
+        {isToday && (
+          <div
+            className="pointer-events-none absolute -top-2 bottom-0 z-30 w-0.5 -translate-x-1/2"
+            style={{
+              left: `${clamp(toPct(now - dayStart))}%`,
+              backgroundColor: METRIC.neutral
+            }}
+          >
+            <div
+              className="absolute -top-0.5 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full"
+              style={{
+                backgroundColor: METRIC.neutral,
+                boxShadow: `0 0 0 2px ${METRIC.neutral}33`
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Легенда */}

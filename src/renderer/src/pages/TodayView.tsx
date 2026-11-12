@@ -17,7 +17,7 @@ import { AppIcon } from '../lib/app-icons'
 import { TagBadge, TagMenu, tagColor, useAppTags } from '../lib/tags'
 import { METRIC } from '../lib/colors'
 import { extractDomain, groupByDomain, isBrowser } from '../lib/domains'
-import { mergeMeetings, meetingSeconds } from '../lib/meetings'
+import { mergeMeetings, meetingSeconds } from '../../../shared/meetings'
 import { DayLane } from '../components/DayLane'
 import { EventList } from '../components/EventList'
 

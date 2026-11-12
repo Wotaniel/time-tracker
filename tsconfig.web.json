@@ -3,7 +3,11 @@
     "composite": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.web.tsbuildinfo",
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
@@ -16,11 +20,13 @@
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
   "include": [
     "src/renderer/src/**/*",
-    "src/shared/types.ts",
+    "src/shared/**/*",
     "src/preload/index.d.ts"
   ]
 }

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **One call was drawn as several slivers** — the same Meet room arrives as `meet.google.com/cqu-vfcz-ftv` and `meet.google.com/meet/cqu-vfcz-ftv`, with `%40` or `@` in `authuser`, and intervals were compared by the raw URL string. Intervals are now merged by room code, and when one side has no link (Meet caught by tab title, Slack huddle) — by source. Gap tolerance raised to 10 minutes for the same room
+- **Meet disappeared while you worked elsewhere** — the open-window list has no URL for a browser, so a call was only visible in the focused window. A tab in a call is titled `Meet - <topic>`, while the home page is `Google Meet`, so the title is now used as a fallback signal
+
+### Changed
+- **«Сейчас» marker overlays the strip and the hour scale** — a 1px line inside the activity band was clipped by the rounded container and read as noise. It is now 2px with a dot at the top, drawn above all three lanes and the hour labels
+
 ### Added
 - **Categories and rules are visible** — rules were applied on event insert and left no trace anywhere: you could not tell whether they worked at all. The app list now shows a category badge (Figma → Development, Slack → Communication) with its colour, the day-strip tooltip names the category, and Settings shows for each rule how many times it fired today and how much time it covered
 - **Duplicate rules removed** — the database held 1650 rules where only 30 were unique: migration 002 seeds ran on every launch before `schema_migrations` existed, producing 55 copies of each rule. `categorizeEvent` parsed all 1650 rows on every event insert. Migration 009 keeps one row per (category, field, match, value)

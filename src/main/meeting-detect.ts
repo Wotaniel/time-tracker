@@ -69,10 +69,25 @@ export function detectMeetingAmong(windows: WindowInfo[]): DetectedMeeting | nul
   return null
 }
 
+/**
+ * Meet по заголовку вкладки.
+ *
+ * В списке открытых окон у браузера нет URL, поэтому звонок «пропадал», стоило
+ * переключиться в Figma. Во время звонка вкладка называется «Meet - <тема>»,
+ * а главная страница — «Google Meet», так что различие есть.
+ */
+function isMeetByTitle(title: string): boolean {
+  return /^meet\s*[-–—:]/i.test(title.trim())
+}
+
 export function detectMeeting(win: WindowInfo): DetectedMeeting | null {
   const code = meetCode(win.url)
   if (code) {
     return { source: 'Google Meet', url: win.url }
+  }
+
+  if (isMeetByTitle(win.windowTitle)) {
+    return { source: 'Google Meet', url: null }
   }
 
   if (isSlackHuddle(win.appName, win.windowTitle)) {
