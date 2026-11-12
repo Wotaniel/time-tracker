@@ -11,10 +11,10 @@
 
 | # | что | готово, когда |
 |---|---|---|
-| A1 | Vitest + тесты ядра: `extractTaskKey`, `extractDomainFromUrl`, `localDayBounds`, `formatLocalDate`, раннер миграций | `npm test` зелёный, ≥15 кейсов |
-| A2 | Репозиторные тесты на реальной SQLite (in-memory): `getDailyStats`, `getDayCoverage`, `getUntagged`, `getMeetingsByRange` | тесты падают при возврате старых багов |
-| A3 | Регрессионные тесты на то, что уже ломалось: диапазон `getDailyStats`, двойной счёт Meet, self-tracking, события через полночь | каждый баг закрыт тестом, который краснел до фикса |
-| A4 | CI: GitHub Actions на push/PR — `typecheck`, `lint`, `test` | прогон зелёный на PR, красный при поломке |
+| A1 | Vitest + тесты ядра: `extractTaskKey`, `extractDomainFromUrl`, `localDayBounds`, `formatLocalDate`, раннер миграций | готово: 23 теста, 0.6 с |
+| A2 | Репозиторные тесты на реальной SQLite (in-memory): `getDailyStats`, `getDayCoverage`, `getUntagged`, `getMeetingsByRange` | готово |
+| A3 | Регрессионные тесты на то, что уже ломалось: диапазон `getDailyStats`, двойной счёт Meet, self-tracking, события через полночь | частично: диапазон и Meet закрыты; полночь — вместе с B1, self-tracking — после выноса логики из main |
+| A4 | CI: GitHub Actions на push/PR — `typecheck`, `lint`, `test` | готово, проверить на первом PR |
 
 ## B. Честные данные
 
