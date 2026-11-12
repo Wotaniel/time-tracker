@@ -18,7 +18,8 @@
     "lint": "eslint src --ext .ts,.tsx",
     "postinstall": "electron-rebuild -f -w better-sqlite3",
     "test": "ELECTRON_RUN_AS_NODE=1 electron ./node_modules/vitest/vitest.mjs run",
-    "test:watch": "ELECTRON_RUN_AS_NODE=1 electron ./node_modules/vitest/vitest.mjs"
+    "test:watch": "ELECTRON_RUN_AS_NODE=1 electron ./node_modules/vitest/vitest.mjs",
+    "report:day": "ELECTRON_RUN_AS_NODE=1 electron scripts/report-day.cjs"
   },
   "dependencies": {
     "active-win": "^8.2.1",
