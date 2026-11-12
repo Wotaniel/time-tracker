@@ -15,6 +15,7 @@ import { formatDuration, formatLocalDate } from '../lib/format'
 import { AppIcon } from '../lib/app-icons'
 import { TagBadge, TagMenu, tagColor, useAppTags } from '../lib/tags'
 import { groupByDomain, isBrowser } from '../lib/domains'
+import { mergeMeetings, meetingSeconds } from '../lib/meetings'
 import { DayLane } from '../components/DayLane'
 import { EventList } from '../components/EventList'
 
@@ -82,11 +83,11 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
     [tags]
   )
 
+  // Перезапуск приложения рвал один звонок на два интервала — склеиваем соседние
+  const mergedMeetings = mergeMeetings(meetings)
+
   const totalActive = summary.reduce((sum, item) => sum + item.totalTime, 0)
-  const meetingTime = meetings.reduce((sum, m) => {
-    const end = m.tsEnd ? new Date(m.tsEnd).getTime() : Date.now()
-    return sum + Math.max(0, Math.round((end - new Date(m.tsStart).getTime()) / 1000))
-  }, 0)
+  const meetingTime = mergedMeetings.reduce((sum, m) => sum + meetingSeconds(m), 0)
 
   const workApps = summary.filter((item) => tags.get(`app:${item.appName}`) === 'work')
   const workTime = workApps.reduce((sum, item) => sum + item.totalTime, 0)
@@ -173,7 +174,7 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
 
       {/* ─── Слой 2: лента дня ──────────────────────────────── */}
       <section className="rounded-lg border border-tt-border bg-tt-surface p-5">
-        <DayLane events={events} meetings={meetings} date={selectedDate} tagFor={tagFor} />
+        <DayLane events={events} meetings={mergedMeetings} date={selectedDate} tagFor={tagFor} />
       </section>
 
       {/* ─── Слой «без тега»: время есть, категории нет ──────── */}

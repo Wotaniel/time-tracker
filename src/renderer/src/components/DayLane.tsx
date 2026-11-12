@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import type { ActivityEvent, Meeting, TagType } from '../../../shared/types'
-import { formatDuration, formatLocalDate, formatTime } from '../lib/format'
+import { formatDuration, formatLocalDate, formatTimeSec } from '../lib/format'
 import { tagColor } from '../lib/tags'
 
 /**
@@ -8,6 +9,9 @@ import { tagColor } from '../lib/tags'
  * Раньше самое ценное представление дня занимало 48 px и делило место со
  * списком событий. Здесь активность — основная полоса, созвоны и простои —
  * тонкие дорожки под ней, плюс метка «сейчас».
+ *
+ * Наведение показывает подробности: полоса из сотен тонких штрихов бесполезна
+ * без ответа «а что именно было в этот момент».
  */
 
 interface DayLaneProps {
@@ -17,9 +21,24 @@ interface DayLaneProps {
   tagFor: (appName: string, url: string | null) => TagType | undefined
 }
 
+interface HoverInfo {
+  leftPct: number
+  title: string
+  meta: string[]
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000
 
+/** Короткая подпись встречи из ссылки: meet.google.com/meet/abc-defg-hij → abc-defg-hij */
+function meetingCode(url: string | null): string | null {
+  if (!url) return null
+  const match = url.match(/meet\.google\.com\/(?:meet\/)?([a-z-]+)/i)
+  return match ? match[1] : null
+}
+
 export function DayLane({ events, meetings, date, tagFor }: DayLaneProps): JSX.Element {
+  const [hover, setHover] = useState<HoverInfo | null>(null)
+
   const dayStart = new Date(`${date}T00:00:00`).getTime()
   const now = Date.now()
   const isToday = date === formatLocalDate(new Date())
@@ -39,22 +58,36 @@ export function DayLane({ events, meetings, date, tagFor }: DayLaneProps): JSX.E
       left: clamp(toPct(start)),
       width: Math.max(toPct(end - start), 0.15),
       color: tagColor(tag),
-      title: `${e.appName} — ${formatDuration(e.duration)} (${formatTime(e.tsStart)}–${formatTime(e.tsEnd)})${
-        e.windowTitle ? `\n${e.windowTitle}` : ''
-      }`
+      hoverInfo: {
+        leftPct: clamp(toPct(start + (end - start) / 2)),
+        title: `${e.appName} — ${formatDuration(e.duration)}`,
+        meta: [
+          `${formatTimeSec(e.tsStart)}–${formatTimeSec(e.tsEnd)}`,
+          ...(e.windowTitle ? [e.windowTitle] : []),
+          ...(e.url ? [e.url] : []),
+          ...(tag ? [`тег: ${tag === 'work' ? 'работа' : tag === 'neutral' ? 'нейтрально' : 'отвлечение'}`] : [])
+        ]
+      }
     }
   })
 
   const meetingBars = meetings.map((m) => {
     const start = new Date(m.tsStart).getTime() - dayStart
     const end = (m.tsEnd ? new Date(m.tsEnd).getTime() : now) - dayStart
+    const code = meetingCode(m.url)
     return {
       key: `meeting-${m.id}`,
       left: clamp(toPct(start)),
       width: Math.max(toPct(end - start), 0.3),
-      title: `Созвон — ${formatDuration(Math.round((end - start) / 1000))} (${formatTime(
-        m.tsStart
-      )}–${m.tsEnd ? formatTime(m.tsEnd) : 'сейчас'})`
+      hoverInfo: {
+        leftPct: clamp(toPct(start + (end - start) / 2)),
+        title: `Созвон — ${formatDuration(Math.round((end - start) / 1000))}`,
+        meta: [
+          `${formatTimeSec(m.tsStart)}–${m.tsEnd ? formatTimeSec(m.tsEnd) : 'сейчас'}`,
+          ...(code ? [`код встречи: ${code}`] : []),
+          'не входит в активность, наложен сверху'
+        ]
+      }
     }
   })
 
@@ -65,12 +98,16 @@ export function DayLane({ events, meetings, date, tagFor }: DayLaneProps): JSX.E
       key: `afk-${e.tsStart}`,
       left: clamp(toPct(start)),
       width: Math.max(toPct(end - start), 0.2),
-      title: `Бездействие — ${formatDuration(e.duration)} (${formatTime(e.tsStart)}–${formatTime(e.tsEnd)})`
+      hoverInfo: {
+        leftPct: clamp(toPct(start + (end - start) / 2)),
+        title: `Бездействие — ${formatDuration(e.duration)}`,
+        meta: [`${formatTimeSec(e.tsStart)}–${formatTimeSec(e.tsEnd)}`, 'не было ввода']
+      }
     }
   })
 
-  // Промежутки, где приложение вообще не работало: без них день выглядит полным
-  const gaps: { key: string; left: number; width: number; title: string }[] = []
+  // Промежутки, где приложение вообще не работало
+  const gaps: { key: string; left: number; width: number; hoverInfo: HoverInfo }[] = []
   const ordered = [...events].sort((a, b) => a.tsStart.localeCompare(b.tsStart))
   for (let i = 1; i < ordered.length; i++) {
     const prevEnd = new Date(ordered[i - 1].tsEnd).getTime()
@@ -81,13 +118,26 @@ export function DayLane({ events, meetings, date, tagFor }: DayLaneProps): JSX.E
       key: `gap-${i}`,
       left: clamp(toPct(prevEnd - dayStart)),
       width: Math.max(toPct(nextStart - prevEnd), 0.2),
-      title: `Не записано — ${formatDuration(gapSec)} (${formatTime(ordered[i - 1].tsEnd)}–${formatTime(
-        ordered[i].tsStart
-      )})`
+      hoverInfo: {
+        leftPct: clamp(toPct((prevEnd + nextStart) / 2 - dayStart)),
+        title: `Нет событий — ${formatDuration(gapSec)}`,
+        meta: [
+          `${formatTimeSec(ordered[i - 1].tsEnd)}–${formatTimeSec(ordered[i].tsStart)}`,
+          'приложение было закрыто, на паузе или не отвечало'
+        ]
+      }
     })
   }
 
   const hourMarks = [0, 3, 6, 9, 12, 15, 18, 21, 24]
+
+  const hoverProps = (info: HoverInfo): {
+    onMouseEnter: () => void
+    onMouseLeave: () => void
+  } => ({
+    onMouseEnter: () => setHover(info),
+    onMouseLeave: () => setHover(null)
+  })
 
   return (
     <div className="select-none">
@@ -98,8 +148,12 @@ export function DayLane({ events, meetings, date, tagFor }: DayLaneProps): JSX.E
             <div
               key={bar.key}
               className="absolute inset-y-0 cursor-help opacity-85 hover:opacity-100"
-              style={{ left: `${bar.left}%`, width: `${bar.width}%`, backgroundColor: bar.color }}
-              title={bar.title}
+              style={{
+                left: `${bar.left}%`,
+                width: `${bar.width}%`,
+                backgroundColor: bar.color
+              }}
+              {...hoverProps(bar.hoverInfo)}
             />
           ))}
 
@@ -119,7 +173,7 @@ export function DayLane({ events, meetings, date, tagFor }: DayLaneProps): JSX.E
               key={bar.key}
               className="absolute inset-y-0 cursor-help rounded-sm bg-tt-purple"
               style={{ left: `${bar.left}%`, width: `${bar.width}%` }}
-              title={bar.title}
+              {...hoverProps(bar.hoverInfo)}
             />
           ))}
         </div>
@@ -131,7 +185,7 @@ export function DayLane({ events, meetings, date, tagFor }: DayLaneProps): JSX.E
               key={gap.key}
               className="absolute inset-y-0 cursor-help bg-tt-red/40"
               style={{ left: `${gap.left}%`, width: `${gap.width}%` }}
-              title={gap.title}
+              {...hoverProps(gap.hoverInfo)}
             />
           ))}
           {afkBars.map((bar) => (
@@ -139,10 +193,29 @@ export function DayLane({ events, meetings, date, tagFor }: DayLaneProps): JSX.E
               key={bar.key}
               className="absolute inset-y-0 cursor-help bg-tt-muted/40"
               style={{ left: `${bar.left}%`, width: `${bar.width}%` }}
-              title={bar.title}
+              {...hoverProps(bar.hoverInfo)}
             />
           ))}
         </div>
+
+        {/* Подробности под курсором */}
+        {hover && (
+          <div
+            className="pointer-events-none absolute z-50 w-72 rounded-lg border border-tt-border bg-tt-bg p-3 shadow-2xl"
+            style={{
+              left: `${Math.min(Math.max(hover.leftPct, 12), 82)}%`,
+              top: 'calc(100% + 8px)',
+              transform: 'translateX(-50%)'
+            }}
+          >
+            <div className="text-xs font-medium text-tt-text">{hover.title}</div>
+            {hover.meta.map((line, idx) => (
+              <div key={idx} className="mt-0.5 truncate text-[11px] text-tt-muted" title={line}>
+                {line}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Часы */}

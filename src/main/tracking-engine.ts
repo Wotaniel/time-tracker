@@ -75,7 +75,6 @@ export class TrackingEngine extends EventEmitter {
   private currentWindowTitle: string = ''
   private currentUrl: string | null = null
   private isPaused: boolean = false
-  private isSelfFocused: boolean = false
   private isPrivateBrowsing: boolean = false
   private isScreenLocked: boolean = false
   private isAfk: boolean = false
@@ -391,25 +390,16 @@ export class TrackingEngine extends EventEmitter {
         return
       }
 
-      const appName = win.owner.name
+      // Своё окно — обычная активность, только с читаемым именем.
+      // Раньше здесь событие закрывалось и время не писалось вовсе: просмотр
+      // статистики оставлял дыру в дне, а в шапке появлялось «Idle».
+      const appName = isSelfActivity(win) ? 'CarpeDiem' : win.owner.name
       const windowTitle = win.title
       const appBundleId = 'bundleId' in win.owner ? (win.owner as { bundleId?: string }).bundleId : undefined
       const url = 'url' in win ? (win as { url?: string }).url ?? null : null
 
       // Google Meet background tracking — update meeting state before normal tracking
       this.updateMeetingTracking(url, Date.now())
-
-      // Skip self-tracking — don't record events for the tracker's own window
-      if (isSelfActivity(win)) {
-        if (!this.isSelfFocused) {
-          // Close current real event to record accurate duration
-          this.closeCurrentEvent()
-          this.isSelfFocused = true
-          this.emitActivityChanged()
-          log.info('[TrackingEngine] Self-focused — keeping last activity as current')
-        }
-        return
-      }
 
       // Locked screen / screensaver — not real activity, don't record.
       // This catches cases where lock-screen event hasn't fired yet (race),
@@ -432,10 +422,6 @@ export class TrackingEngine extends EventEmitter {
         }
         return
       }
-
-      // Coming back from self-focus → force new event even if same app
-      const wasSelfFocused = this.isSelfFocused
-      this.isSelfFocused = false
 
       // Coming back from locked screen → force new event
       const wasScreenLocked = this.isScreenLocked
@@ -460,7 +446,6 @@ export class TrackingEngine extends EventEmitter {
       const changed =
         appName !== this.currentAppName ||
         windowTitle !== this.currentWindowTitle ||
-        wasSelfFocused ||
         wasScreenLocked ||
         wasPrivateBrowsing
 
