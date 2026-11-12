@@ -134,7 +134,10 @@ export function DayLane({ events, meetings, date, tagFor, categoryFor }: DayLane
     })
   }
 
-  const hourMarks = [0, 3, 6, 9, 12, 15, 18, 21, 24]
+  // Все 24 часа: рабочий отрезок занимает треть ширины, и без частых
+  // насечек по шкале не понять, где что. Подписи стоят по своим местам,
+  // а не «между делом», как при justify-between.
+  const hours = Array.from({ length: 24 }, (_, h) => h)
 
   const hoverProps = (info: HoverInfo): {
     onMouseEnter: () => void
@@ -227,9 +230,33 @@ export function DayLane({ events, meetings, date, tagFor, categoryFor }: DayLane
         )}
 
         {/* Часы внутри того же контейнера: линия «сейчас» должна заезжать и на них */}
-        <div className="mt-1 flex justify-between text-[10px] text-tt-muted">
-          {hourMarks.map((h) => (
-            <span key={h}>{h}</span>
+        <div className="relative mt-1 h-1.5">
+          {hours.map((h) => (
+            <span
+              key={h}
+              className="absolute top-0 h-full w-px"
+              style={{
+                left: `${(h / 24) * 100}%`,
+                backgroundColor: h % 6 === 0 ? METRIC.afk : '#414868'
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="relative mt-0.5 h-3 text-[9px] leading-none">
+          {hours.map((h) => (
+            <span
+              key={h}
+              className={`absolute ${
+                h % 6 === 0 ? 'font-semibold text-tt-text' : 'text-tt-muted'
+              }`}
+              style={{
+                left: `${(h / 24) * 100}%`,
+                transform: h === 0 ? 'none' : 'translateX(-50%)'
+              }}
+            >
+              {h}
+            </span>
           ))}
         </div>
 
