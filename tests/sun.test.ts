@@ -1,30 +1,33 @@
 import { describe, expect, it } from 'vitest'
 import { sunTimes } from '../src/shared/sun'
 
-/** «ЧЧ:ММ» в локальной зоне машины — тесты идут в MSK (UTC+3) */
+/**
+ * «ЧЧ:ММ» в UTC. Раньше форматировали локально — тесты проходили на машине
+ * в MSK и падали на CI-раннере в UTC (расхождение ровно на 3 часа).
+ */
 function hhmm(ms: number | null): string | null {
   if (ms === null) return null
   const d = new Date(ms)
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
 }
+
+const toMin = (v: string): number => Number(v.slice(0, 2)) * 60 + Number(v.slice(3))
 
 const MOSCOW = { lat: 55.75, lon: 37.62 }
 
 describe('рассвет и закат', () => {
-  it('Москва, солнцестояние: около 03:44 и 21:18', () => {
+  it('Москва, солнцестояние: 00:44 и 18:18 UTC (03:44 и 21:18 МСК)', () => {
     const { sunrise, sunset } = sunTimes('2026-06-21', MOSCOW.lat, MOSCOW.lon)
     expect(hhmm(sunrise)).not.toBeNull()
     // Допуск 10 минут: алгоритм упрощённый
-    const toMin = (v: string): number => Number(v.slice(0, 2)) * 60 + Number(v.slice(3))
-    expect(Math.abs(toMin(hhmm(sunrise)!) - (3 * 60 + 44))).toBeLessThan(10)
-    expect(Math.abs(toMin(hhmm(sunset)!) - (21 * 60 + 18))).toBeLessThan(10)
+    expect(Math.abs(toMin(hhmm(sunrise)!) - (0 * 60 + 44))).toBeLessThan(10)
+    expect(Math.abs(toMin(hhmm(sunset)!) - (18 * 60 + 18))).toBeLessThan(10)
   })
 
-  it('Москва, декабрь: короткий день, около 09:00 и 16:00', () => {
+  it('Москва, декабрь: короткий день, 06:00 и 13:00 UTC (09:00 и 16:00 МСК)', () => {
     const { sunrise, sunset } = sunTimes('2026-12-21', MOSCOW.lat, MOSCOW.lon)
-    const toMin = (v: string): number => Number(v.slice(0, 2)) * 60 + Number(v.slice(3))
-    expect(Math.abs(toMin(hhmm(sunrise)!) - (9 * 60 + 0))).toBeLessThan(15)
-    expect(Math.abs(toMin(hhmm(sunset)!) - (16 * 60 + 0))).toBeLessThan(15)
+    expect(Math.abs(toMin(hhmm(sunrise)!) - (6 * 60 + 0))).toBeLessThan(15)
+    expect(Math.abs(toMin(hhmm(sunset)!) - (13 * 60 + 0))).toBeLessThan(15)
   })
 
   it('полярный день: события нет, а не полночь', () => {
