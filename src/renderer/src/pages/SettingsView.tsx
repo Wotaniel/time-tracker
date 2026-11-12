@@ -5,6 +5,7 @@ import { RulesSection } from '../components/RulesSection'
 export default function SettingsView(): JSX.Element {
   const [autostart, setAutostart] = useState(false)
   const [idleThreshold, setIdleThreshold] = useState(600)
+  const [workGoalHours, setWorkGoalHours] = useState(0)
   const [excludedApps, setExcludedApps] = useState<string[]>([])
   const [newApp, setNewApp] = useState('')
   const [loading, setLoading] = useState(true)
@@ -14,10 +15,13 @@ export default function SettingsView(): JSX.Element {
     Promise.all([
       window.api.settings.get('autostart'),
       window.api.settings.get('idleThreshold'),
-      window.api.settings.get('excludedApps')
-    ]).then(([auto, idle, excluded]) => {
+      window.api.settings.get('excludedApps'),
+      window.api.settings.get('dailyWorkGoal')
+    ]).then(([auto, idle, excluded, goal]) => {
       setAutostart(auto === true || auto === 'true')
       setIdleThreshold(typeof idle === 'number' ? idle : parseInt(String(idle ?? '60')) || 60)
+      const goalMinutes = typeof goal === 'number' ? goal : parseInt(String(goal ?? '0')) || 0
+      setWorkGoalHours(Math.round((goalMinutes / 60) * 10) / 10)
       setExcludedApps(Array.isArray(excluded) ? excluded : [])
       setLoading(false)
     })
@@ -32,6 +36,12 @@ export default function SettingsView(): JSX.Element {
   const saveIdleThreshold = async (value: number): Promise<void> => {
     setIdleThreshold(value)
     await window.api.settings.set('idleThreshold', value)
+  }
+
+  const saveWorkGoal = async (hours: number): Promise<void> => {
+    const safe = Math.max(0, Math.min(hours, 16))
+    setWorkGoalHours(safe)
+    await window.api.settings.set('dailyWorkGoal', Math.round(safe * 60))
   }
 
   const saveExcludedApps = async (apps: string[]): Promise<void> => {
@@ -171,6 +181,31 @@ export default function SettingsView(): JSX.Element {
               Правила и категории
             </h3>
             <RulesSection />
+          </div>
+
+          {/* Working goal */}
+          <div className="space-y-3 rounded-lg border border-tt-border bg-tt-surface p-5">
+            <h3 className="flex items-center gap-2 text-sm font-medium">
+              <Clock size={16} className="text-tt-accent" />
+              Цель по работе
+            </h3>
+            <div className="text-xs text-tt-muted">
+              Сколько рабочих часов в день вы считаете нормой. Появится прогресс на «Сегодня» и
+              серия дней на «Неделе». Ноль — цель выключена.
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                max="16"
+                step="0.5"
+                value={workGoalHours}
+                onChange={(e) => setWorkGoalHours(Number(e.target.value))}
+                onBlur={() => saveWorkGoal(workGoalHours)}
+                className="w-24 rounded-lg border border-tt-border bg-tt-bg px-3 py-1.5 text-sm text-tt-text focus:border-tt-accent focus:outline-none"
+              />
+              <span className="text-xs text-tt-muted">часов в день</span>
+            </div>
           </div>
 
           {/* Exclusion list */}
