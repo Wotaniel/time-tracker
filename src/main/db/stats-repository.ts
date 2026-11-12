@@ -154,6 +154,7 @@ export class StatsRepository {
           WHERE e.ts_start >= ? AND e.ts_start <= ? AND e.is_afk = 0
             AND e.url IS NOT NULL AND e.url != ''
             AND extractDomainFromUrl(e.url) IS NOT NULL
+            AND extractDomainFromUrl(e.url) != ''
             AND NOT EXISTS (
               SELECT 1 FROM app_tags t
               WHERE t.target_type = 'domain' AND t.target_key = extractDomainFromUrl(e.url)

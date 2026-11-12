@@ -29,6 +29,7 @@ export function extractDomain(url: string | null): string | null {
   try {
     const u = new URL(url)
     const host = u.hostname.replace(/^www\./, '')
+    if (!host) return null
     if (host === 'localhost' || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
       return u.port ? `${host}:${u.port}` : host
     }

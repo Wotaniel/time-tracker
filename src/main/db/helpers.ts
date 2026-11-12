@@ -209,6 +209,8 @@ export function extractDomainFromUrl(url: string): string | null {
   try {
     const u = new URL(url)
     const host = u.hostname.replace(/^www\./, '')
+    // file:// и подобные схемы дают пустой host: это не домен
+    if (!host) return null
     // localhost и IP-адреса — добавляем порт для различения localhost:3001 vs localhost:8501
     if (host === 'localhost' || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
       return u.port ? `${host}:${u.port}` : host

@@ -37,6 +37,11 @@ describe('extractDomainFromUrl', () => {
     expect(extractDomainFromUrl('')).toBeNull()
   })
 
+  it('file:// не считается доменом', () => {
+    expect(extractDomainFromUrl('file:///Users/me/page.html')).toBeNull()
+    expect(extractDomainFromUrl('about:blank')).toBeNull()
+  })
+
   it('разбирает домен без схемы', () => {
     expect(extractDomainFromUrl('jira.int.agrd.dev/browse/AG-1')).toBe('jira.int.agrd.dev')
   })
