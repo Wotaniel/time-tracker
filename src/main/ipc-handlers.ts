@@ -7,6 +7,7 @@ import type { TrackingEngine } from './tracking-engine'
 import type { AFKDetector } from './afk-detector'
 import type { TrackingHealth } from './tracking-health'
 import { getAppIcon } from './app-icons'
+import { validateDate } from './validation'
 import { IPC_CHANNELS, type Category, type CategoryRule, type TagTargetType, type TagType } from '../shared/types'
 
 /**
@@ -388,13 +389,6 @@ function assertRuleMatchType(matchType: string): asserts matchType is CategoryRu
   }
 }
 
-function validateDate(dateStr: string): void {
-  // Простой валидатор: YYYY-MM-DD
-  const regex = /^\d{4}-\d{2}-\d{2}$/
-  if (!regex.test(dateStr)) {
-    throw new Error(`Invalid date format: ${dateStr}. Expected YYYY-MM-DD.`)
-  }
-}
 
 function csvEscape(value: string): string {
   // Если содержит запятую, кавычку или перевод строки — оборачиваем в кавычки

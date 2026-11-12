@@ -38,7 +38,7 @@ describe('getDailyStats', () => {
     const events = new EventRepository(db)
     const stats = new StatsRepository(db)
 
-    insertEvent(events, { tsStart: at(-5, 10), tsEnd: at(-5, 11), duration: 600 })
+    insertEvent(events, { tsStart: at(-5, 10), tsEnd: at(-5, 10, 10), duration: 600 })
 
     const rows = stats.getDailyStats(7)
     const day = rows.find((r) => r.date === dayOffset(-5))
@@ -51,8 +51,8 @@ describe('getDailyStats', () => {
     const events = new EventRepository(db)
     const stats = new StatsRepository(db)
 
-    insertEvent(events, { tsStart: at(-2, 9), tsEnd: at(-2, 10), duration: 300 })
-    insertEvent(events, { tsStart: at(-1, 9), tsEnd: at(-1, 10), duration: 900 })
+    insertEvent(events, { tsStart: at(-2, 9), tsEnd: at(-2, 9, 5), duration: 300 })
+    insertEvent(events, { tsStart: at(-1, 9), tsEnd: at(-1, 9, 15), duration: 900 })
 
     const rows = stats.getDailyStats(3)
     expect(rows.find((r) => r.date === dayOffset(-2))?.totalActive).toBe(300)
