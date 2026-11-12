@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`npm run report:day`** — facts about a day in a machine-readable form, so the morning digest has something to read: `--date`, `--days`, `--format md|json`. Prints activity / AFK / not recorded, top apps, top sites, Jira task keys with time, merged meetings, and gaps over 15 minutes. Read-only, runs under `ELECTRON_RUN_AS_NODE=1 electron` because `better-sqlite3` is built for Electron's ABI; the database path can be overridden with `CARPEDIEM_DB`
+
 ### Fixed
 - **An event crossing midnight vanished from the next day** — day queries filtered by `ts_start` only, so work from 23:50 to 00:30 was counted entirely for yesterday and today lost the tail. Day queries now select by overlap and clamp to the day bounds, and `getDailyStats` splits an event across local days (`splitAcrossLocalDays`)
 - **`getTopApps` inflated percentages** — the denominator was the sum of the returned top-N rows, so top-10 always added up to 100%. It now uses the total time of the period
