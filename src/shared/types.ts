@@ -51,6 +51,18 @@ export interface DaySummary {
 }
 
 /**
+ * Созвон. Живёт отдельно от событий: параллельная работа и разговор — это одно
+ * и то же время, поэтому созвон накладывается на шкалу, а не прибавляется к ней.
+ */
+export interface Meeting {
+  id: number
+  tsStart: string
+  tsEnd: string | null // null — созвон ещё идёт
+  url: string | null
+  title: string | null
+}
+
+/**
  * Покрытие дня: на что ушло время с первого до последнего события.
  * Без разбивки день выглядит короче, чем был, и не видно, куда делось остальное.
  */
@@ -134,7 +146,7 @@ export interface HeatmapCell {
  * Без этого состояния поломка выглядит как «работающее приложение с пустой лентой»,
  * поэтому UI обязан показывать её явно.
  */
-export type TrackingBlockReason = 'accessibility' | 'bundle-integrity'
+export type TrackingBlockReason = 'accessibility' | 'bundle-integrity' | 'window-access'
 
 export interface TrackingHealthStatus {
   /** Трекер пишет данные прямо сейчас */
@@ -159,6 +171,7 @@ export const IPC_CHANNELS = {
   STATS_GET_TASKS: 'stats:getTasks',
   ACTIVITIES_GET_AFK_TIME: 'activities:getAfkTime',
   ACTIVITIES_GET_DAY_COVERAGE: 'activities:getDayCoverage',
+  MEETINGS_GET_DAY: 'meetings:getDay',
   CATEGORIES_GET_ALL: 'categories:getAll',
   CATEGORIES_UPSERT: 'categories:upsert',
   CATEGORIES_DELETE: 'categories:delete',
@@ -198,6 +211,9 @@ export interface TimeTrackerApi {
     getSummaryDetailed: (date: string) => Promise<DetailedDaySummary[]>
     getAfkTime: (date: string) => Promise<number>
     getDayCoverage: (date: string) => Promise<DayCoverage>
+  }
+  meetings: {
+    getDay: (date: string) => Promise<Meeting[]>
   }
   stats: {
     getDaily: (days: number) => Promise<DailyStat[]>

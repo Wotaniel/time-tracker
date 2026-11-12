@@ -73,6 +73,7 @@ function checkBundleIntegrity(): BundleIntegrity {
 
 export class TrackingHealth extends EventEmitter {
   private granted: boolean
+  private windowAccessOk = true
   private integrity: BundleIntegrity
   private pollTimer: NodeJS.Timeout | null = null
   private waitingSince = 0
@@ -89,11 +90,35 @@ export class TrackingHealth extends EventEmitter {
   }
 
   getStatus(): TrackingHealthStatus {
+    const blockedBy = this.granted
+      ? this.windowAccessOk
+        ? null
+        : 'window-access'
+      : this.integrity.ok
+        ? 'accessibility'
+        : 'bundle-integrity'
+
     return {
-      tracking: this.granted,
-      blockedBy: this.granted ? null : this.integrity.ok ? 'accessibility' : 'bundle-integrity',
+      tracking: blockedBy === null,
+      blockedBy,
       bundlePath: this.integrity.ok ? null : this.integrity.bundlePath
     }
+  }
+
+  /**
+   * Активное окно перестало читаться: зависший хелпер active-win, отозванное
+   * разрешение, отвалившийся Screen Recording. Раньше в этом состоянии трекер
+   * молчал, и поломка была не видна до пустой ленты.
+   */
+  setWindowAccess(ok: boolean): void {
+    if (this.windowAccessOk === ok) return
+    this.windowAccessOk = ok
+    if (ok) {
+      log.info('[Health] Активное окно снова читается — трекинг продолжается')
+    } else {
+      log.error('[Health] Активное окно не читается — трекинг не пишет данные')
+    }
+    this.emit('changed', this.getStatus())
   }
 
   /**

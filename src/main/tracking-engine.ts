@@ -25,6 +25,12 @@ function isSelfActivity(win: NonNullable<Awaited<ReturnType<typeof activeWin>>>)
 /** Как часто пишем прогресс открытого события, чтобы сводки были живыми */
 const PROGRESS_INTERVAL_MS = 5000
 
+/** Сколько может идти один тик, прежде чем считаем его зависшим */
+const POLL_STALL_MS = 10_000
+
+/** После стольких неудачных опросов подряд считаем, что окна не читаются */
+const POLL_FAILURE_LIMIT = 10
+
 /** Приложения, которые появляются когда экран заблокирован / скринсейвер.
  * active-win на macOS возвращает loginwindow когда экран залочен,
  * ScreenSaverEngine — когда активен скринсейвер. Это не реальная активность. */
@@ -76,6 +82,9 @@ export class TrackingEngine extends EventEmitter {
   private excludedApps: Set<string> = new Set()
   private hasAccessibilityPermission: boolean = false
   private lastProgressAt: number = 0
+  private pollInFlight = false      // защита от наложения тиков poll()
+  private pollStartedAt = 0
+  private activeWinFailures = 0     // подряд неудачных опросов активного окна
 
   // ─── Google Meet background tracking ────────────────────
   // Когда созвон активен (meet.google.com в foreground),
@@ -84,6 +93,8 @@ export class TrackingEngine extends EventEmitter {
   // фоновый event для Meet, чтобы время звонка не терялось.
   private meetingActive: boolean = false  // идёт ли сейчас созвон
   private meetingLastSeen: number = 0  // Date.now() последнего наблюдения Meet
+  private meetingId: number | null = null  // запись в meetings, пока созвон идёт
+  private lastMeetingWrite: number = 0
   private readonly MEETING_TIMEOUT_MS = 10 * 60 * 1000 // 10 мин без Meet → созвон окончен
 
   constructor(db: DatabaseManager) {
@@ -144,6 +155,10 @@ export class TrackingEngine extends EventEmitter {
     if (this.intervalId) {
       clearInterval(this.intervalId)
       this.intervalId = null
+    }
+    if (this.meetingActive) {
+      this.meetingActive = false
+      this.closeMeetingInterval(Date.now())
     }
     this.closeCurrentEvent()
     log.info('[TrackingEngine] Stopped')
@@ -243,30 +258,101 @@ export class TrackingEngine extends EventEmitter {
   // ─── Google Meet background tracking ────────────────────────
 
   /**
-   * Обработка Google Meet. Фоновое событие больше не пишем: оно шло
-   * параллельно обычным событиям и попадало в те же SUM(duration), то есть
-   * время созвона считалось дважды (а при закрытии по meetingLastSeen
-   * получалась отрицательная длительность — конец раньше начала).
-   * Пока пользователь на созвоне и переключается в другие окна, его время
-   * и так записано обычными событиями. Здесь остаётся только состояние
-   * встречи: во время неё AFK не срабатывает.
+   * Обработка Google Meet: пишем интервал созвона отдельной записью.
+   *
+   * Почему не событием: созвон идёт параллельно с работой (человек в Figma
+   * и в звонке одновременно). События суммируются в SUM(duration), и время
+   * считалось бы дважды — это уже случалось ранее. Интервал в `meetings`
+   * накладывается на шкалу активности и в сумму не входит.
+   *
+   * ts_end продлевается, пока вкладка встречи видна или пока с последнего
+   * её появления не прошёл таймаут: созвон продолжается, даже если окно
+   * переключили.
    */
   private updateMeetingTracking(url: string | null, now: number): void {
     if (isMeetCallUrl(url)) {
-      this.meetingActive = true
+      if (!this.meetingActive) {
+        this.meetingActive = true
+        this.meetingId = this.db.startMeeting(
+          new Date(now).toISOString(),
+          url,
+          'Google Meet'
+        )
+        this.lastMeetingWrite = now
+        log.info('[TrackingEngine] Meeting started')
+      }
       this.meetingLastSeen = now
+      this.flushMeeting(now)
       return
     }
 
-    if (this.meetingActive && now - this.meetingLastSeen > this.MEETING_TIMEOUT_MS) {
+    if (!this.meetingActive) return
+
+    if (now - this.meetingLastSeen > this.MEETING_TIMEOUT_MS) {
       this.meetingActive = false
+      this.closeMeetingInterval(now)
       log.info('[TrackingEngine] Meeting ended (timeout)')
+      return
     }
+
+    // Вкладка не в фокусе, но созвон идёт — интервал продолжается
+    this.flushMeeting(now)
+  }
+
+  /** Продлевает интервал созвона не чаще раза в PROGRESS_INTERVAL_MS */
+  private flushMeeting(now: number): void {
+    if (this.meetingId === null) return
+    if (now - this.lastMeetingWrite < PROGRESS_INTERVAL_MS) return
+    this.lastMeetingWrite = now
+
+    try {
+      this.db.extendMeeting(this.meetingId, new Date(now).toISOString())
+    } catch (err) {
+      log.error('[TrackingEngine] meeting update failed:', err)
+    }
+  }
+
+  private closeMeetingInterval(now: number): void {
+    if (this.meetingId === null) return
+
+    try {
+      this.db.closeMeeting(this.meetingId, new Date(now).toISOString())
+    } catch (err) {
+      log.error('[TrackingEngine] meeting close failed:', err)
+    }
+    this.meetingId = null
   }
 
   // ─── Core polling ────────────────────────────────────────────
 
+  /**
+   * Обёртка тика. Без неё зависший вызов activeWin() превращался в катастрофу:
+   * setInterval продолжал спавнить хелперы, каждый блокировался на проверке
+   * разрешений, и за минуты накапливались десятки висящих процессов — трекер
+   * молча переставал писать. Здесь одновременно выполняется не больше одного тика,
+   * а зависший тик снимается сторожевым таймером.
+   */
   private async poll(): Promise<void> {
+    if (this.pollInFlight) {
+      const stuckMs = Date.now() - this.pollStartedAt
+      if (stuckMs > POLL_STALL_MS) {
+        log.error(`[TrackingEngine] Тик висит ${Math.round(stuckMs / 1000)} с — снимаю его`)
+        this.pollInFlight = false
+        this.reportWindowAccess(false)
+      }
+      return
+    }
+
+    this.pollInFlight = true
+    this.pollStartedAt = Date.now()
+    try {
+      await this.pollOnce()
+    } finally {
+      this.pollInFlight = false
+    }
+  }
+
+  private async pollOnce(): Promise<void> {
     try {
       if (this.isPaused || this.isAfk) return
 
@@ -278,8 +364,20 @@ export class TrackingEngine extends EventEmitter {
       let win: Awaited<ReturnType<typeof activeWin>>
       try {
         win = await activeWin()
+        this.activeWinFailures = 0
+        this.reportWindowAccess(true)
       } catch (err) {
-        log.error('[TrackingEngine] activeWin error:', err)
+        this.activeWinFailures += 1
+        // Логируем первую неудачу и дальше раз в минуту, а не каждую секунду
+        if (this.activeWinFailures === 1 || this.activeWinFailures % 60 === 0) {
+          log.error(
+            `[TrackingEngine] activeWin error (подряд ${this.activeWinFailures}):`,
+            err
+          )
+        }
+        if (this.activeWinFailures >= POLL_FAILURE_LIMIT) {
+          this.reportWindowAccess(false)
+        }
         return
       }
 
@@ -408,6 +506,14 @@ export class TrackingEngine extends EventEmitter {
       isAfk: false,
       isPrivate: false
     })
+  }
+
+  /**
+   * Сообщает наружу, что активное окно не читается (зависший хелпер active-win,
+   * отозванное разрешение). Без этого трекер умирал молча — как это уже случалось.
+   */
+  private reportWindowAccess(ok: boolean): void {
+    this.emit('window-access', ok)
   }
 
   /**

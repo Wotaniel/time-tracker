@@ -25,6 +25,9 @@ const api = {
     getAfkTime: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.ACTIVITIES_GET_AFK_TIME, date),
     getDayCoverage: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.ACTIVITIES_GET_DAY_COVERAGE, date)
   },
+  meetings: {
+    getDay: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.MEETINGS_GET_DAY, date)
+  },
   stats: {
     getDaily: (days: number) => ipcRenderer.invoke(IPC_CHANNELS.STATS_GET_DAILY, days),
     getTopApps: (from: string, to: string, limit?: number) => ipcRenderer.invoke(IPC_CHANNELS.STATS_GET_TOP_APPS, from, to, limit),

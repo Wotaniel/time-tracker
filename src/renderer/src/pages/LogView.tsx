@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import type { ActivityEvent } from '../../../shared/types'
+import type { ActivityEvent, Meeting } from '../../../shared/types'
 import { formatDuration, formatLocalDate, formatTime } from '../lib/format'
 
 /**
@@ -30,6 +30,8 @@ export default function LogView({ selectedDate, onDateChange, embedded }: {
     leftPct: number
   } | null>(null)
 
+  const [meetings, setMeetings] = useState<Meeting[]>([])
+
   const loadEvents = useCallback(async () => {
     setLoading(true)
     const result = await window.api.activities.getDay(selectedDate)
@@ -39,7 +41,8 @@ export default function LogView({ selectedDate, onDateChange, embedded }: {
 
   useEffect(() => {
     loadEvents()
-  }, [loadEvents])
+    window.api.meetings.getDay(selectedDate).then(setMeetings)
+  }, [loadEvents, selectedDate])
 
   // Date navigation
   const shiftDate = (days: number): void => {
@@ -75,6 +78,18 @@ export default function LogView({ selectedDate, onDateChange, embedded }: {
     const leftPct = (startMs / dayMs) * 100
     const widthPct = ((endMs - startMs) / dayMs) * 100
     return { event: e, leftPct, widthPct, color: colorForApp(e.appName) }
+  })
+
+  // Созвоны — отдельная дорожка над активностью: они идут параллельно работе
+  // и не должны сливаться с ней в одну полосу
+  const meetingBars = meetings.map((m) => {
+    const startMs = Math.max(0, new Date(m.tsStart).getTime() - dayStart.getTime())
+    const endMs = Math.min(dayMs, (m.tsEnd ? new Date(m.tsEnd).getTime() : Date.now()) - dayStart.getTime())
+    return {
+      meeting: m,
+      leftPct: (startMs / dayMs) * 100,
+      widthPct: Math.max(((endMs - startMs) / dayMs) * 100, 0.3)
+    }
   })
 
   // Hour markers for the timeline (0, 6, 12, 18, 24)
@@ -128,6 +143,22 @@ export default function LogView({ selectedDate, onDateChange, embedded }: {
 
           {/* Timeline bar + tooltip overlay */}
           <div className="relative">
+            {/* Созвоны — тонкая дорожка над активностью */}
+            {meetingBars.length > 0 && (
+              <div className="relative mb-1 h-2 w-full overflow-hidden rounded bg-tt-bg">
+                {meetingBars.map((bar, idx) => (
+                  <div
+                    key={idx}
+                    className="absolute inset-y-0 rounded-sm bg-tt-purple cursor-help"
+                    style={{ left: `${bar.leftPct}%`, width: `${bar.widthPct}%` }}
+                    title={`Созвон — ${formatTime(bar.meeting.tsStart)} to ${
+                      bar.meeting.tsEnd ? formatTime(bar.meeting.tsEnd) : 'сейчас'
+                    }${bar.meeting.title ? '\n' + bar.meeting.title : ''}`}
+                  />
+                ))}
+              </div>
+            )}
+
             {/* Timeline bar */}
             <div className="relative h-12 w-full overflow-hidden rounded bg-tt-bg">
               {eventBars.map((bar, idx) => (

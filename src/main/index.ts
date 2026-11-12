@@ -259,6 +259,11 @@ app.whenReady().then(() => {
   })
   trackingHealth.ensure(() => tracker?.start())
 
+  // Трекер сообщает, читается ли активное окно — иначе поломка снова станет тихой
+  tracker.on('window-access', (ok: boolean) => {
+    trackingHealth?.setWindowAccess(ok)
+  })
+
   // Initialize AFK detector — load threshold from DB settings
   const savedThreshold = db.getSetting('idleThreshold')
   // 10 минут по умолчанию: 2 минуты резали обычное чтение и обдумывание
