@@ -196,31 +196,26 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
       </section>
 
       {/* ─── Слой «без тега»: время есть, категории нет ──────── */}
-      <section className="rounded-lg border border-tt-border bg-tt-surface">
-        <div className="flex items-baseline justify-between px-4 py-2.5">
-          <h2 className="text-xs font-medium uppercase tracking-wide text-tt-muted">Без тега</h2>
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] text-tt-muted">
-              {untaggedRows.length === 0
-                ? 'очередь пуста'
-                : `${untaggedRows.length} · ${formatDuration(untaggedTotal)}`}
-            </span>
-            {onOpenSettings && (
-              <button
-                onClick={onOpenSettings}
-                className="no-drag text-[11px] text-tt-accent hover:underline"
-                title="Правила и категории"
-              >
-                правила →
-              </button>
-            )}
+      {/* Пустую очередь не показываем: блок без содержимого только занимает место */}
+      {untaggedRows.length > 0 && (
+        <section className="rounded-lg border border-tt-border bg-tt-surface">
+          <div className="flex items-baseline justify-between px-4 py-2.5">
+            <h2 className="text-xs font-medium uppercase tracking-wide text-tt-muted">Без тега</h2>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-tt-muted">
+                {untaggedRows.length} · {formatDuration(untaggedTotal)}
+              </span>
+              {onOpenSettings && (
+                <button
+                  onClick={onOpenSettings}
+                  className="no-drag text-[11px] text-tt-accent hover:underline"
+                  title="Правила и категории"
+                >
+                  правила →
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-        {untaggedRows.length === 0 ? (
-          <p className="border-t border-tt-border px-4 py-3 text-xs text-tt-muted">
-            Всё размечено: за этот день не осталось времени без категории.
-          </p>
-        ) : (
           <div className="border-t border-tt-border">
             <p className="px-4 pt-2 text-[11px] text-tt-muted">
               Время есть, но неизвестно, работа это или отвлечение. Тег применится к приложению
@@ -258,8 +253,8 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
               })}
             </div>
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* ─── Слой 4: приложения ─────────────────────────────── */}
       <section>
