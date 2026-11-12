@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`SDD.md` replaced by `docs/ARCHITECTURE.md`** — the old design doc described a different program: `tray.ts`, `pages/Timeline.tsx`, `hooks/useActivities`, 15 IPC channels where there are 34, a schema without `task_key`/`meetings`/`app_tags`. The new document is written from the code; references in `README.md`, `AGENTS.md` and `.github/copilot-instructions.md` point to it
+- **Personal agent config is out of the repository** — `.agents/` (37 files) and `skills-lock.json` moved to `.gitignore`; the files stay on disk for local use
+
+### Fixed
+- **`unhandledRejection` was swallowed** — in a packaged build stderr goes nowhere, so a rejected promise disappeared without a trace. Now logged to the file the same way as uncaught exceptions
+- **Tray refresh timer outlived the app** — it could fire after `db.close()`; now cleared on quit
+
+### Removed
+- Dead code: `src/main/title-parser.ts` (never imported) and the `date-fns` dependency (never used)
+- Content Security Policy added to `renderer/index.html`: `default-src 'self'`, no external connections; `ws:`/`localhost` kept only for the dev server
+
 ### Added
 - **The day strip zooms with the scroll wheel** — 24 hours spread over the strip made the working part a third of the width and a mess of 1–2 px strokes. Scrolling over the strip zooms from 1 hour up to the whole day around the cursor, shift+scroll moves the window, and «весь день» / «сейчас» / ‹ › jump back. The hour scale follows: hourly labels when zoomed in, every 2–3 hours when wide
 

@@ -46,3 +46,7 @@ yarn-error.log*
 
 # OS
 Thumbs.db
+
+# Личная агентская конфигурация — не часть продукта
+.agents/
+skills-lock.json

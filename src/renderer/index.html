@@ -3,7 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Time Tracker</title>
+    <!-- CSP: приложение локальное, наружу ничего не нужно. ws: и localhost
+         оставлены для dev-режима (HMR), в сборке они не используются. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' ws: wss: http://localhost:*; object-src 'none'; base-uri 'none'"
+    />
+    <title>CarpeDiem</title>
   </head>
   <body class="bg-tt-bg text-tt-text">
     <div id="root"></div>
