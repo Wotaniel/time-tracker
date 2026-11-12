@@ -18,6 +18,7 @@ import type {
 import { formatDuration, formatLocalDate, formatShort } from '../lib/format'
 import { TAG_CONFIG } from '../lib/tags'
 import { METRIC } from '../lib/colors'
+import { reachedTier, WEEKLY_GOAL_HOURS } from '../../../shared/goal'
 import { mergeMeetings, meetingSeconds } from '../../../shared/meetings'
 
 /**
@@ -61,6 +62,7 @@ export default function WeekView(): JSX.Element {
   const [showHeatmap, setShowHeatmap] = useState(false)
   const [workDays, setWorkDays] = useState<WorkDayStat[]>([])
   const [goalSeconds, setGoalSeconds] = useState(0)
+  const [weekGoalSeconds, setWeekGoalSeconds] = useState(WEEKLY_GOAL_HOURS * 3600)
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
@@ -73,8 +75,9 @@ export default function WeekView(): JSX.Element {
       window.api.meetings.getRange(from, today),
       window.api.meetings.getRange(prevFrom, prevTo),
       window.api.stats.getWorkByDay(shiftDate(-29), today),
-      window.api.settings.get('dailyWorkGoal')
-    ]).then(([d, tc, tp, top, heat, mc, mp, wd, goal]) => {
+      window.api.settings.get('dailyWorkGoal'),
+      window.api.settings.get('weeklyWorkGoal')
+    ]).then(([d, tc, tp, top, heat, mc, mp, wd, goal, weekGoal]) => {
       setDaily(d)
       setTagCurrent(tc)
       setTagPrev(tp)
@@ -85,6 +88,9 @@ export default function WeekView(): JSX.Element {
       setWorkDays(wd as WorkDayStat[])
       const goalMinutes = typeof goal === 'number' ? goal : parseInt(String(goal ?? '0')) || 0
       setGoalSeconds(goalMinutes * 60)
+      const weekGoalMinutes =
+        typeof weekGoal === 'number' ? weekGoal : parseInt(String(weekGoal ?? '')) || WEEKLY_GOAL_HOURS * 60
+      setWeekGoalSeconds(weekGoalMinutes * 60)
     })
   }, [from, today, prevFrom, prevTo])
 
@@ -130,7 +136,7 @@ export default function WeekView(): JSX.Element {
     (sum, row) => sum + (workDays.find((d) => d.date === row.date)?.seconds ?? 0),
     0
   )
-  const weekGoal = goalSeconds * 7
+  const weekGoal = weekGoalSeconds
 
   return (
     <div className="space-y-5">
@@ -194,18 +200,30 @@ export default function WeekView(): JSX.Element {
         </p>
       )}
 
-      {goalSeconds > 0 && (
+      {weekGoal > 0 && (
         <section className="rounded-lg border border-tt-border bg-tt-surface p-5">
           <div className="mb-1 flex items-baseline justify-between text-xs">
             <span className="text-tt-muted">
-              Цель недели{' '}
-              <span className="text-tt-text">{formatDuration(weekGoal)}</span> — сделано{' '}
+              Цель недели <span className="text-tt-text">{formatDuration(weekGoal)}</span> — сделано{' '}
               <span style={{ color: METRIC.work }}>{formatDuration(weekWork)}</span>
+              {(() => {
+                const tier = reachedTier(weekWork, weekGoal)
+                if (!tier) return null
+                const color =
+                  tier.tier === 'gold' ? '#e0af68' : tier.tier === 'silver' ? '#c0caf5' : '#cd7f32'
+                return (
+                  <span className="ml-2" style={{ color }}>
+                    {tier.label}
+                  </span>
+                )
+              })()}
             </span>
-            <span className="text-tt-muted">
-              серия <span className="text-tt-text">{streak}</span>{' '}
-              {streak === 1 ? 'день' : streak >= 2 && streak <= 4 ? 'дня' : 'дней'} подряд
-            </span>
+            {goalSeconds > 0 && (
+              <span className="text-tt-muted">
+                серия <span className="text-tt-text">{streak}</span>{' '}
+                {streak === 1 ? 'день' : streak >= 2 && streak <= 4 ? 'дня' : 'дней'} подряд
+              </span>
+            )}
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded bg-tt-bg">
             <div

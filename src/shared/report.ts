@@ -5,6 +5,8 @@
  * а main только поставляет данные.
  */
 
+import { reachedTier } from './goal'
+
 export interface PeriodReportInput {
   from: string
   to: string
@@ -12,8 +14,10 @@ export interface PeriodReportInput {
   workSeconds: number
   meetingSeconds: number
   afkSeconds: number
-  /** Цель в день, 0 — выключена */
-  goalSecondsPerDay: number
+  /** Недельная норма, 0 — выключена */
+  weekGoalSeconds: number
+  /** Дневной порог для серии, 0 — не считать */
+  dayGoalSeconds: number
   /** Рабочее время по дням — для серии */
   workByDay: { date: string; seconds: number }[]
   topApps: { appName: string; totalTime: number }[]
@@ -66,14 +70,16 @@ export function buildPeriodReport(input: PeriodReportInput): string {
   )
   lines.push('')
 
-  if (input.goalSecondsPerDay > 0) {
-    const goal = input.goalSecondsPerDay * input.workByDay.length
-    const percent = goal > 0 ? Math.round((input.workSeconds / goal) * 100) : 0
-    const streak = streakDays(input.workByDay, input.goalSecondsPerDay)
+  if (input.weekGoalSeconds > 0) {
+    const percent = Math.round((input.workSeconds / input.weekGoalSeconds) * 100)
+    const tier = reachedTier(input.workSeconds, input.weekGoalSeconds)
+    const tierPart = tier ? `, уровень: ${tier.label}` : ''
+    const streak = streakDays(input.workByDay, input.dayGoalSeconds)
+    const streakPart = input.dayGoalSeconds > 0 ? `, серия ${streak} ${pluralDays(streak)}` : ''
     lines.push(
-      `Цель ${humanDuration(input.goalSecondsPerDay)}/день: ${humanDuration(
+      `Цель недели ${humanDuration(input.weekGoalSeconds)}: ${humanDuration(
         input.workSeconds
-      )} из ${humanDuration(goal)} (${percent}%), серия ${streak} ${pluralDays(streak)}`
+      )} (${percent}%)${tierPart}${streakPart}`
     )
     lines.push('')
   }

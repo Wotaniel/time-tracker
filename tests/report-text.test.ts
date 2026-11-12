@@ -14,7 +14,8 @@ const base: PeriodReportInput = {
   workSeconds: 27 * 3600 + 5 * 60,
   meetingSeconds: 4 * 3600 + 20 * 60,
   afkSeconds: 5 * 3600,
-  goalSecondsPerDay: 0,
+  weekGoalSeconds: 0,
+  dayGoalSeconds: 0,
   workByDay: [],
   topApps: [],
   tasks: []
@@ -67,18 +68,31 @@ describe('buildPeriodReport', () => {
     expect(text).not.toContain('Задачи')
   })
 
-  it('с целью печатает проценты и серию', () => {
+  it('печатает недельную цель, уровень и серию', () => {
     const text = buildPeriodReport({
       ...base,
-      goalSecondsPerDay: 6 * 3600,
+      weekGoalSeconds: 40 * 3600,
+      dayGoalSeconds: 6 * 3600,
+      workSeconds: 36 * 3600,
       workByDay: [
         { date: '2026-11-11', seconds: 7 * 3600 },
         { date: '2026-11-12', seconds: 6 * 3600 }
       ]
     })
-    expect(text).toContain('Цель 6ч/день')
+    expect(text).toContain('Цель недели 40ч')
+    expect(text).toContain('уровень: серебро')
     expect(text).toContain('серия 2 дня')
     expect(text).toMatch(/\(\d+%\)/)
+  })
+
+  it('без достигнутого уровня не печатает его', () => {
+    const text = buildPeriodReport({
+      ...base,
+      weekGoalSeconds: 40 * 3600,
+      workSeconds: 10 * 3600,
+      workByDay: [{ date: '2026-11-12', seconds: 10 * 3600 }]
+    })
+    expect(text).not.toContain('уровень')
   })
 
   it('печатает топ приложений и задачи', () => {
