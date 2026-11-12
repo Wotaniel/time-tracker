@@ -6,7 +6,7 @@ import { CITIES } from '../../../shared/cities'
 export default function SettingsView(): JSX.Element {
   const [autostart, setAutostart] = useState(false)
   const [idleThreshold, setIdleThreshold] = useState(600)
-  const [workGoalHours, setWorkGoalHours] = useState(0)
+  const [workGoalHours, setWorkGoalHours] = useState(6)
   const [weekGoalHours, setWeekGoalHours] = useState(40)
   const [primaryCity, setPrimaryCity] = useState('moscow')
   const [secondaryCity, setSecondaryCity] = useState('')
@@ -275,7 +275,8 @@ export default function SettingsView(): JSX.Element {
               <span className="text-xs text-tt-muted">часов в неделю</span>
             </div>
             <div className="text-xs text-tt-muted">
-              Дневная цель ниже — для прогресса на «Сегодня» и серии дней.
+              Дневная норма ниже: норма, +1 час — «круто», +2 — «перебор». При 6 часах это
+              6 / 7 / 8. По ней же считается серия дней.
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -288,7 +289,7 @@ export default function SettingsView(): JSX.Element {
                 onBlur={() => saveWorkGoal(workGoalHours)}
                 className="w-24 rounded-lg border border-tt-border bg-tt-bg px-3 py-1.5 text-sm text-tt-text focus:border-tt-accent focus:outline-none"
               />
-              <span className="text-xs text-tt-muted">часов в день</span>
+              <span className="text-xs text-tt-muted">часов в день (норма)</span>
             </div>
           </div>
 

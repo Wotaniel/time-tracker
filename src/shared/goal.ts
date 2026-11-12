@@ -16,6 +16,34 @@ export interface GoalTierInfo {
 
 export const WEEKLY_GOAL_HOURS = 40
 
+/**
+ * Дневные уровни: база — норма, +1 час — «круто», +2 — «перебор».
+ * При норме 6 часов это ровно 6 / 7 / 8, как и просил Али.
+ */
+export type DailyTier = 'fine' | 'cool' | 'over' | 'none'
+
+export interface DailyTierInfo {
+  tier: DailyTier
+  label: string
+  seconds: number
+}
+
+export const DAILY_GOAL_HOURS = 6
+
+export function dailyGoalTiers(baseSeconds: number): DailyTierInfo[] {
+  return [
+    { tier: 'fine', label: 'норм', seconds: baseSeconds },
+    { tier: 'cool', label: 'круто', seconds: baseSeconds + 3600 },
+    { tier: 'over', label: 'перебор', seconds: baseSeconds + 2 * 3600 }
+  ]
+}
+
+/** Достигнутый дневной уровень: от высшего к низшему */
+export function reachedDailyTier(workedSeconds: number, baseSeconds: number): DailyTierInfo | null {
+  if (baseSeconds <= 0) return null
+  return dailyGoalTiers(baseSeconds).reverse().find((t) => workedSeconds >= t.seconds) ?? null
+}
+
 export function weeklyGoalTiers(goalSeconds: number): GoalTierInfo[] {
   return [
     { tier: 'gold', label: 'золото', seconds: goalSeconds },

@@ -19,6 +19,7 @@ import { METRIC } from '../lib/colors'
 import { extractDomain, groupByDomain, isBrowser } from '../lib/domains'
 import { mergeMeetings, meetingSeconds } from '../../../shared/meetings'
 import { sunTimes, type SunTimes } from '../../../shared/sun'
+import { DAILY_GOAL_HOURS, dailyGoalTiers, reachedDailyTier } from '../../../shared/goal'
 import { findCity, type City } from '../../../shared/cities'
 import { DayLane } from '../components/DayLane'
 import { EventList } from '../components/EventList'
@@ -75,7 +76,8 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
   useEffect(() => {
     window.api.categories.getAll().then(setCategories)
     window.api.settings.get('dailyWorkGoal').then((value) => {
-      const minutes = typeof value === 'number' ? value : parseInt(String(value ?? '0')) || 0
+      const minutes =
+        typeof value === 'number' ? value : parseInt(String(value ?? '')) || DAILY_GOAL_HOURS * 60
       setGoalSeconds(minutes * 60)
     })
     Promise.all([
@@ -212,35 +214,59 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
             </div>
           </div>
 
-          {/* Цель по работе */}
-          {goalSeconds > 0 && (
-            <div className="w-full max-w-md pb-1">
-              <div className="mb-1 flex items-baseline justify-between text-[11px] text-tt-muted">
-                <span>
-                  работа к цели {formatDuration(goalSeconds)}
-                  {workTime >= goalSeconds ? (
-                    <span className="ml-2" style={{ color: METRIC.work }}>
-                      выполнена
+          {/* Дневная цель: три уровня */}
+          {goalSeconds > 0 &&
+            (() => {
+              const tiers = dailyGoalTiers(goalSeconds)
+              const reached = reachedDailyTier(workTime, goalSeconds)
+              const next = tiers.find((t) => workTime < t.seconds)
+              const top = tiers[tiers.length - 1].seconds
+              const tierColor =
+                reached?.tier === 'over'
+                  ? '#e0af68'
+                  : reached?.tier === 'cool'
+                    ? METRIC.neutral
+                    : METRIC.work
+
+              return (
+                <div className="w-full max-w-md pb-1">
+                  <div className="mb-1 flex items-baseline justify-between text-[11px] text-tt-muted">
+                    <span>
+                      работа{' '}
+                      <span style={{ color: METRIC.work }}>{formatDuration(workTime)}</span>
+                      {' · '}
+                      {reached ? (
+                        <span style={{ color: tierColor }}>{reached.label}</span>
+                      ) : next ? (
+                        <span>до «{next.label}» {formatDuration(next.seconds - workTime)}</span>
+                      ) : null}
                     </span>
-                  ) : (
-                    <span className="ml-2">
-                      осталось {formatDuration(goalSeconds - workTime)}
+                    <span>
+                      {next ? `следующий: ${next.label}` : 'все уровни взяты'}
                     </span>
-                  )}
-                </span>
-                <span>{Math.round((workTime / goalSeconds) * 100)}%</span>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded bg-tt-bg">
-                <div
-                  className="h-full rounded"
-                  style={{
-                    width: `${Math.min((workTime / goalSeconds) * 100, 100)}%`,
-                    backgroundColor: METRIC.work
-                  }}
-                />
-              </div>
-            </div>
-          )}
+                  </div>
+
+                  {/* Полоса с отметками уровней */}
+                  <div className="relative h-1.5 w-full overflow-hidden rounded bg-tt-bg">
+                    <div
+                      className="h-full rounded"
+                      style={{
+                        width: `${Math.min((workTime / top) * 100, 100)}%`,
+                        backgroundColor: tierColor
+                      }}
+                    />
+                    {tiers.slice(0, -1).map((tier) => (
+                      <span
+                        key={tier.tier}
+                        className="absolute top-0 h-full w-px bg-tt-bg"
+                        style={{ left: `${(tier.seconds / top) * 100}%` }}
+                        title={`${tier.label} — ${formatDuration(tier.seconds)}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
 
           {/* Слой 3: куда ушло остальное */}
           <div className="flex flex-wrap gap-x-6 gap-y-1 pb-1 text-xs text-tt-muted">
