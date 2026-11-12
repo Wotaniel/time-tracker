@@ -1,18 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ActivityEvent, Meeting, TagType } from '../../../shared/types'
 import { formatDuration, formatLocalDate, formatTimeSec } from '../lib/format'
 import { tagColor } from '../lib/tags'
 import { METRIC } from '../lib/colors'
 
 /**
- * Лента дня: три дорожки вместо одной полоски.
+ * Лента дня: три дорожки, масштаб и подробности.
  *
- * Раньше самое ценное представление дня занимало 48 px и делило место со
- * списком событий. Здесь активность — основная полоса, созвоны и простои —
- * тонкие дорожки под ней, плюс метка «сейчас».
- *
- * Наведение показывает подробности: полоса из сотен тонких штрихов бесполезна
- * без ответа «а что именно было в этот момент».
+ * 24 часа на всю ширину — это треть экрана на рабочий отрезок и штрихи по 1–2 px.
+ * Поэтому окно можно сузить до 12/6/3/1 часа и подвинуть: тогда видно отдельные
+ * окна и разрывы без тултипа.
  */
 
 interface DayLaneProps {
@@ -30,85 +27,128 @@ interface HoverInfo {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
+const HOUR_MS = 60 * 60 * 1000
+/** Пределы масштаба: от часа до суток */
+const MIN_VIEW_MS = HOUR_MS
+const MAX_VIEW_MS = DAY_MS
+/** Шаг колеса: 20% за щелчок */
+const ZOOM_STEP = 1.2
 
-/** Короткая подпись встречи из ссылки: meet.google.com/meet/abc-defg-hij → abc-defg-hij */
+/** Короткая подпись встречи: meet.google.com/meet/abc-defg-hij → abc-defg-hij */
 function meetingCode(url: string | null): string | null {
   if (!url) return null
   const match = url.match(/meet\.google\.com\/(?:meet\/)?([a-z-]+)/i)
   return match ? match[1] : null
 }
 
-export function DayLane({ events, meetings, date, tagFor, categoryFor }: DayLaneProps): JSX.Element {
+export function DayLane({
+  events,
+  meetings,
+  date,
+  tagFor,
+  categoryFor
+}: DayLaneProps): JSX.Element {
   const [hover, setHover] = useState<HoverInfo | null>(null)
+  // Масштаб — доля суток: колесо мыши сужает окно вокруг курсора
+  const [viewMs, setViewMs] = useState(DAY_MS)
+  const [windowStart, setWindowStart] = useState<number | null>(null)
+  const laneRef = useRef<HTMLDivElement>(null)
 
   const dayStart = new Date(`${date}T00:00:00`).getTime()
   const now = Date.now()
   const isToday = date === formatLocalDate(new Date())
 
-  const toPct = (ms: number): number => (ms / DAY_MS) * 100
-  const clamp = (value: number): number => Math.min(Math.max(value, 0), 100)
+  const clampStart = (value: number, span: number): number =>
+    Math.min(Math.max(value, dayStart), dayStart + DAY_MS - span)
+
+  const centerOnNow = (span = viewMs): number => (isToday ? now - span / 2 : dayStart + 9 * HOUR_MS)
+
+  const rawStart = windowStart ?? (viewMs >= DAY_MS ? dayStart : centerOnNow())
+  const start = clampStart(rawStart, viewMs)
+  const end = start + viewMs
+
+  const place = (fromMs: number, toMs: number): { left: number; width: number } | null => {
+    const from = Math.max(fromMs, start)
+    const to = Math.min(toMs, end)
+    if (to <= from) return null
+    const left = Math.min(Math.max(((from - start) / viewMs) * 100, 0), 100)
+    return { left, width: Math.max(((to - from) / viewMs) * 100, 0.15) }
+  }
 
   const active = events.filter((e) => !e.isAfk)
   const afk = events.filter((e) => e.isAfk)
 
-  const activityBars = active.map((e) => {
-    const start = new Date(e.tsStart).getTime() - dayStart
-    const end = new Date(e.tsEnd).getTime() - dayStart
+  const activityBars = active.flatMap((e) => {
+    const geometry = place(new Date(e.tsStart).getTime(), new Date(e.tsEnd).getTime())
+    if (!geometry) return []
     const tag = tagFor(e.appName, e.url ?? null)
-    return {
-      key: `${e.tsStart}-${e.appName}`,
-      left: clamp(toPct(start)),
-      width: Math.max(toPct(end - start), 0.15),
-      color: tagColor(tag),
-      hoverInfo: {
-        leftPct: clamp(toPct(start + (end - start) / 2)),
-        title: `${e.appName} — ${formatDuration(e.duration)}`,
-        meta: [
-          `${formatTimeSec(e.tsStart)}–${formatTimeSec(e.tsEnd)}`,
-          ...(e.windowTitle ? [e.windowTitle] : []),
-          ...(e.url ? [e.url] : []),
-          ...(tag
-            ? [`тег: ${tag === 'work' ? 'работа' : tag === 'neutral' ? 'нейтрально' : 'отвлечение'}`]
-            : []),
-          ...(categoryFor(e.categoryId) ? [`категория: ${categoryFor(e.categoryId)}`] : [])
-        ]
+    const category = categoryFor(e.categoryId)
+    return [
+      {
+        key: `${e.tsStart}-${e.appName}`,
+        ...geometry,
+        color: tagColor(tag),
+        hoverInfo: {
+          leftPct: geometry.left + geometry.width / 2,
+          title: `${e.appName} — ${formatDuration(e.duration)}`,
+          meta: [
+            `${formatTimeSec(e.tsStart)}–${formatTimeSec(e.tsEnd)}`,
+            ...(e.windowTitle ? [e.windowTitle] : []),
+            ...(e.url ? [e.url] : []),
+            ...(tag
+              ? [
+                  `тег: ${
+                    tag === 'work' ? 'работа' : tag === 'neutral' ? 'нейтрально' : 'отвлечение'
+                  }`
+                ]
+              : []),
+            ...(category ? [`категория: ${category}`] : [])
+          ]
+        }
       }
-    }
+    ]
   })
 
-  const meetingBars = meetings.map((m) => {
-    const start = new Date(m.tsStart).getTime() - dayStart
-    const end = (m.tsEnd ? new Date(m.tsEnd).getTime() : now) - dayStart
+  const meetingBars = meetings.flatMap((m) => {
+    const from = new Date(m.tsStart).getTime()
+    const to = m.tsEnd ? new Date(m.tsEnd).getTime() : now
+    const geometry = place(from, to)
+    if (!geometry) return []
     const code = meetingCode(m.url)
-    return {
-      key: `meeting-${m.id}`,
-      left: clamp(toPct(start)),
-      width: Math.max(toPct(end - start), 0.3),
-      hoverInfo: {
-        leftPct: clamp(toPct(start + (end - start) / 2)),
-        title: `Созвон — ${formatDuration(Math.round((end - start) / 1000))}`,
-        meta: [
-          `${formatTimeSec(m.tsStart)}–${m.tsEnd ? formatTimeSec(m.tsEnd) : 'сейчас'}`,
-          ...(code ? [`код встречи: ${code}`] : []),
-          'не входит в активность, наложен сверху'
-        ]
+    return [
+      {
+        key: `meeting-${m.id}`,
+        ...geometry,
+        hoverInfo: {
+          leftPct: geometry.left + geometry.width / 2,
+          title: `Созвон — ${formatDuration(Math.round((to - from) / 1000))}`,
+          meta: [
+            `${formatTimeSec(m.tsStart)}–${m.tsEnd ? formatTimeSec(m.tsEnd) : 'сейчас'}`,
+            ...(m.title ? [m.title] : []),
+            ...(code ? [`код встречи: ${code}`] : []),
+            'не входит в активность, наложен сверху'
+          ]
+        }
       }
-    }
+    ]
   })
 
-  const afkBars = afk.map((e) => {
-    const start = new Date(e.tsStart).getTime() - dayStart
-    const end = new Date(e.tsEnd).getTime() - dayStart
-    return {
-      key: `afk-${e.tsStart}`,
-      left: clamp(toPct(start)),
-      width: Math.max(toPct(end - start), 0.2),
-      hoverInfo: {
-        leftPct: clamp(toPct(start + (end - start) / 2)),
-        title: `Бездействие — ${formatDuration(e.duration)}`,
-        meta: [`${formatTimeSec(e.tsStart)}–${formatTimeSec(e.tsEnd)}`, 'не было ввода']
+  const afkBars = afk.flatMap((e) => {
+    const from = new Date(e.tsStart).getTime()
+    const to = new Date(e.tsEnd).getTime()
+    const geometry = place(from, to)
+    if (!geometry) return []
+    return [
+      {
+        key: `afk-${e.tsStart}`,
+        ...geometry,
+        hoverInfo: {
+          leftPct: geometry.left + geometry.width / 2,
+          title: `Бездействие — ${formatDuration(e.duration)}`,
+          meta: [`${formatTimeSec(e.tsStart)}–${formatTimeSec(e.tsEnd)}`, 'не было ввода']
+        }
       }
-    }
+    ]
   })
 
   // Промежутки, где приложение вообще не работало
@@ -119,12 +159,13 @@ export function DayLane({ events, meetings, date, tagFor, categoryFor }: DayLane
     const nextStart = new Date(ordered[i].tsStart).getTime()
     const gapSec = Math.round((nextStart - prevEnd) / 1000)
     if (gapSec < 60) continue
+    const geometry = place(prevEnd, nextStart)
+    if (!geometry) continue
     gaps.push({
       key: `gap-${i}`,
-      left: clamp(toPct(prevEnd - dayStart)),
-      width: Math.max(toPct(nextStart - prevEnd), 0.2),
+      ...geometry,
       hoverInfo: {
-        leftPct: clamp(toPct((prevEnd + nextStart) / 2 - dayStart)),
+        leftPct: geometry.left + geometry.width / 2,
         title: `Нет событий — ${formatDuration(gapSec)}`,
         meta: [
           `${formatTimeSec(ordered[i - 1].tsEnd)}–${formatTimeSec(ordered[i].tsStart)}`,
@@ -134,22 +175,105 @@ export function DayLane({ events, meetings, date, tagFor, categoryFor }: DayLane
     })
   }
 
-  // Все 24 часа: рабочий отрезок занимает треть ширины, и без частых
-  // насечек по шкале не понять, где что. Подписи стоят по своим местам,
-  // а не «между делом», как при justify-between.
-  const hours = Array.from({ length: 24 }, (_, h) => h)
+  const hourStep = viewMs <= 6 * HOUR_MS ? 1 : viewMs <= 12 * HOUR_MS ? 2 : 3
+  const hoursInView = Array.from({ length: 24 }, (_, h) => h).filter((h) => {
+    const at = dayStart + h * HOUR_MS
+    return at >= start - HOUR_MS / 2 && at <= end + HOUR_MS / 2 && h % hourStep === 0
+  })
 
-  const hoverProps = (info: HoverInfo): {
-    onMouseEnter: () => void
-    onMouseLeave: () => void
-  } => ({
+  const pan = (direction: -1 | 1): void => {
+    setWindowStart(clampStart(start + direction * (viewMs / 2), viewMs))
+  }
+
+  /**
+   * Колесо над лентой: вверх — крупнее, вниз — мельче, точка под курсором
+   * остаётся на месте. Слушаем нативно, потому что React вешает wheel
+   * пассивным и preventDefault не сработает — страница начала бы скроллиться.
+   */
+  useEffect(() => {
+    const el = laneRef.current
+    if (!el) return
+
+    const onWheel = (event: WheelEvent): void => {
+      // Зажат shift или это трекпадная горизонталь — двигаем окно
+      if (event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+        event.preventDefault()
+        const delta = (event.deltaX || event.deltaY) * (viewMs / 800)
+        setWindowStart(clampStart(start + delta, viewMs))
+        return
+      }
+
+      event.preventDefault()
+      const rect = el.getBoundingClientRect()
+      const ratio = Math.min(Math.max((event.clientX - rect.left) / rect.width, 0), 1)
+      const anchorMs = start + ratio * viewMs
+      const nextMs = Math.min(
+        Math.max(viewMs * (event.deltaY > 0 ? ZOOM_STEP : 1 / ZOOM_STEP), MIN_VIEW_MS),
+        MAX_VIEW_MS
+      )
+      setViewMs(nextMs)
+      setWindowStart(clampStart(anchorMs - ratio * nextMs, nextMs))
+    }
+
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [viewMs, start])
+
+  const hoverProps = (info: HoverInfo): { onMouseEnter: () => void; onMouseLeave: () => void } => ({
     onMouseEnter: () => setHover(info),
     onMouseLeave: () => setHover(null)
   })
 
   return (
     <div className="select-none">
-      <div className="relative">
+      {/* Масштаб — колесом; кнопками только панорама */}
+      <div className="mb-2 flex items-center justify-between text-[11px] text-tt-muted">
+        <span>
+          масштаб <span className="text-tt-text">{(viewMs / HOUR_MS).toFixed(0)}ч</span>
+          <span className="ml-2 opacity-70">колесо — приблизить, shift+колесо или › ‹ — сдвинуть</span>
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => pan(-1)}
+            disabled={viewMs >= DAY_MS || start <= dayStart}
+            className="no-drag rounded px-1.5 py-0.5 hover:text-tt-text disabled:opacity-30"
+            title="Раньше"
+          >
+            ‹
+          </button>
+          <button
+            onClick={() => {
+              setViewMs(DAY_MS)
+              setWindowStart(dayStart)
+            }}
+            disabled={viewMs >= DAY_MS}
+            className="no-drag rounded px-1.5 py-0.5 hover:text-tt-text disabled:opacity-30"
+            title="Показать весь день"
+          >
+            весь день
+          </button>
+          <button
+            onClick={() => {
+              setViewMs(3 * HOUR_MS)
+              setWindowStart(clampStart(centerOnNow(3 * HOUR_MS), 3 * HOUR_MS))
+            }}
+            className="no-drag rounded px-1.5 py-0.5 hover:text-tt-text"
+            title="Около текущего времени"
+          >
+            сейчас
+          </button>
+          <button
+            onClick={() => pan(1)}
+            disabled={viewMs >= DAY_MS || start >= dayStart + DAY_MS - viewMs}
+            className="no-drag rounded px-1.5 py-0.5 hover:text-tt-text disabled:opacity-30"
+            title="Позже"
+          >
+            ›
+          </button>
+        </div>
+      </div>
+
+      <div className="relative" ref={laneRef}>
         {/* Активность — главная дорожка */}
         <div className="relative h-16 w-full overflow-hidden rounded bg-tt-bg">
           {activityBars.map((bar) => (
@@ -231,41 +355,47 @@ export function DayLane({ events, meetings, date, tagFor, categoryFor }: DayLane
 
         {/* Часы внутри того же контейнера: линия «сейчас» должна заезжать и на них */}
         <div className="relative mt-1 h-1.5">
-          {hours.map((h) => (
-            <span
-              key={h}
-              className="absolute top-0 h-full w-px"
-              style={{
-                left: `${(h / 24) * 100}%`,
-                backgroundColor: h % 6 === 0 ? METRIC.afk : '#414868'
-              }}
-            />
-          ))}
+          {hoursInView.map((h) => {
+            const at = dayStart + h * HOUR_MS
+            return (
+              <span
+                key={h}
+                className="absolute top-0 h-full w-px"
+                style={{
+                  left: `${((at - start) / viewMs) * 100}%`,
+                  backgroundColor: h % 6 === 0 ? METRIC.afk : '#414868'
+                }}
+              />
+            )
+          })}
         </div>
 
         <div className="relative mt-0.5 h-3 text-[9px] leading-none">
-          {hours.map((h) => (
-            <span
-              key={h}
-              className={`absolute ${
-                h % 6 === 0 ? 'font-semibold text-tt-text' : 'text-tt-muted'
-              }`}
-              style={{
-                left: `${(h / 24) * 100}%`,
-                transform: h === 0 ? 'none' : 'translateX(-50%)'
-              }}
-            >
-              {h}
-            </span>
-          ))}
+          {hoursInView.map((h) => {
+            const at = dayStart + h * HOUR_MS
+            return (
+              <span
+                key={h}
+                className={`absolute ${
+                  h % 6 === 0 ? 'font-semibold text-tt-text' : 'text-tt-muted'
+                }`}
+                style={{
+                  left: `${((at - start) / viewMs) * 100}%`,
+                  transform: h === 0 ? 'none' : 'translateX(-50%)'
+                }}
+              >
+                {h}
+              </span>
+            )
+          })}
         </div>
 
-        {/* Метка «сейчас» поверх дорожек и шкалы: не обрезается контейнером */}
-        {isToday && (
+        {/* Метка «сейчас» поверх дорожек и шкалы */}
+        {isToday && now >= start && now <= end && (
           <div
             className="pointer-events-none absolute -top-2 bottom-0 z-30 w-0.5 -translate-x-1/2"
             style={{
-              left: `${clamp(toPct(now - dayStart))}%`,
+              left: `${((now - start) / viewMs) * 100}%`,
               backgroundColor: METRIC.neutral
             }}
           >

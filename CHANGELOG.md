@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **The day strip zooms with the scroll wheel** — 24 hours spread over the strip made the working part a third of the width and a mess of 1–2 px strokes. Scrolling over the strip zooms from 1 hour up to the whole day around the cursor, shift+scroll moves the window, and «весь день» / «сейчас» / ‹ › jump back. The hour scale follows: hourly labels when zoomed in, every 2–3 hours when wide
+
+### Changed
 - **«Остальное» and «Созвоны» in the day's tasks** — the task list left you guessing what the rest of the working day was. It now ends with a remainder row (work not attributed to any Jira key, minus meetings) and a separate meetings row, and a summary line shows that the three add up: `Работа за день 5ч 16м — задачи 2ч 48м, остальное 1ч 3м, созвоны 1ч 25м`
 - **Meetings are merged the same way everywhere** — the daily report and the week KPI still compared raw URLs and used a 2-minute gap, so they showed 68 minutes where the day card showed 85. Both now use the same code-based merge with a 20-minute tolerance as `shared/meetings.ts`
 
