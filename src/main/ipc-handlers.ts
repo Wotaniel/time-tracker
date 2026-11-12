@@ -294,6 +294,12 @@ export function registerIpcHandlers(
     return db.getTaskStats(from, to)
   })
 
+  ipcMain.handle(IPC_CHANNELS.STATS_GET_WORK_BY_DAY, (_event, from: string, to: string) => {
+    validateDate(from)
+    validateDate(to)
+    return db.getWorkByDay(from, to)
+  })
+
   // ─── App icons ───────────────────────────────────────────────
 
   ipcMain.handle(
@@ -353,6 +359,7 @@ const ALLOWED_SETTING_KEYS = new Set([
   'autostart',
   'excludedApps',
   'idleThreshold',
+  'dailyWorkGoal',
 ])
 
 function assertSettingKey(key: string): void {

@@ -37,7 +37,9 @@ const api = {
     getHeatmap: (from: string, to: string) => ipcRenderer.invoke(IPC_CHANNELS.STATS_GET_HEATMAP, from, to),
     getTagStats: (from: string, to: string) => ipcRenderer.invoke(IPC_CHANNELS.STATS_GET_TAG_STATS, from, to),
     getWork: (from: string, to: string) => ipcRenderer.invoke(IPC_CHANNELS.STATS_GET_WORK, from, to),
-    getTasks: (from: string, to: string) => ipcRenderer.invoke(IPC_CHANNELS.STATS_GET_TASKS, from, to)
+    getTasks: (from: string, to: string) => ipcRenderer.invoke(IPC_CHANNELS.STATS_GET_TASKS, from, to),
+    getWorkByDay: (from: string, to: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.STATS_GET_WORK_BY_DAY, from, to)
   },
   categories: {
     getAll: () => ipcRenderer.invoke(IPC_CHANNELS.CATEGORIES_GET_ALL),

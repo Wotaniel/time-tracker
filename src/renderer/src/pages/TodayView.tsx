@@ -41,6 +41,7 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
   const [tasks, setTasks] = useState<TaskStat[]>([])
   const [untagged, setUntagged] = useState<UntaggedEntry[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [goalSeconds, setGoalSeconds] = useState(0)
   const { tags, setTag, deleteTag } = useAppTags()
 
   // Всё, что показывает день, обновляется вместе: раньше созвоны и покрытие
@@ -69,6 +70,10 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
   // Категории приходят из правил: показываем их, иначе работа правил не видна
   useEffect(() => {
     window.api.categories.getAll().then(setCategories)
+    window.api.settings.get('dailyWorkGoal').then((value) => {
+      const minutes = typeof value === 'number' ? value : parseInt(String(value ?? '0')) || 0
+      setGoalSeconds(minutes * 60)
+    })
   }, [])
 
   const categoryById = new Map(categories.map((c) => [c.id, c]))
@@ -188,6 +193,36 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
               {formatDuration(totalActive)}
             </div>
           </div>
+
+          {/* Цель по работе */}
+          {goalSeconds > 0 && (
+            <div className="w-full max-w-md pb-1">
+              <div className="mb-1 flex items-baseline justify-between text-[11px] text-tt-muted">
+                <span>
+                  цель {formatDuration(goalSeconds)}
+                  {workTime >= goalSeconds ? (
+                    <span className="ml-2" style={{ color: METRIC.work }}>
+                      выполнена
+                    </span>
+                  ) : (
+                    <span className="ml-2">
+                      осталось {formatDuration(goalSeconds - workTime)}
+                    </span>
+                  )}
+                </span>
+                <span>{Math.round((workTime / goalSeconds) * 100)}%</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded bg-tt-bg">
+                <div
+                  className="h-full rounded"
+                  style={{
+                    width: `${Math.min((workTime / goalSeconds) * 100, 100)}%`,
+                    backgroundColor: METRIC.work
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Слой 3: куда ушло остальное */}
           <div className="flex flex-wrap gap-x-6 gap-y-1 pb-1 text-xs text-tt-muted">

@@ -18,7 +18,8 @@ import type {
   WorkAppStat,
   TaskStat,
   TagTargetType,
-  UntaggedEntry
+  UntaggedEntry,
+  WorkDayStat
 } from '../../shared/types'
 import {
   localDayBounds,
@@ -166,6 +167,55 @@ export class StatsRepository {
       .all(start, end, start, end) as { targetType: TagTargetType; targetKey: string; seconds: number }[]
 
     return rows.map((r) => ({ targetType: r.targetType, targetKey: r.targetKey, seconds: r.seconds }))
+  }
+
+  /**
+   * Рабочее время по дням — для целей и серий.
+   *
+   * Считается по тем же правилам, что и «работа» в интерфейсе: тег work
+   * у приложения ИЛИ у домена. Событие через полночь режется по суткам.
+   * Дни без работы попадают в результат нулями, иначе не посчитать серию.
+   */
+  getWorkByDay(fromDate: string, toDate: string): WorkDayStat[] {
+    const { start } = localDayBounds(fromDate)
+    const { end } = localDayBounds(toDate)
+
+    const rows = this.db
+      .prepare(`
+        SELECT app_name, url, ts_start, ts_end
+        FROM events
+        WHERE ts_start <= ? AND ts_end >= ? AND is_afk = 0
+      `)
+      .all(end, start) as { app_name: string; url: string | null; ts_start: string; ts_end: string }[]
+
+    const appWork = new Set<string>()
+    const domainWork = new Set<string>()
+    for (const tag of this.tagRepo.getAllAppTags()) {
+      if (tag.tag !== 'work') continue
+      if (tag.targetType === 'app') appWork.add(tag.targetKey)
+      else domainWork.add(tag.targetKey)
+    }
+
+    const byDay = new Map<string, number>()
+    for (const row of rows) {
+      const domain = row.url ? extractDomainFromUrl(row.url) : null
+      const isWork = appWork.has(row.app_name) || (domain ? domainWork.has(domain) : false)
+      if (!isWork) continue
+
+      for (const slice of splitAcrossLocalDays(row.ts_start, row.ts_end)) {
+        byDay.set(slice.date, (byDay.get(slice.date) ?? 0) + slice.seconds)
+      }
+    }
+
+    const result: WorkDayStat[] = []
+    const cursor = new Date(`${fromDate}T00:00:00`)
+    const last = new Date(`${toDate}T00:00:00`)
+    while (cursor <= last) {
+      const date = formatLocalDate(cursor)
+      result.push({ date, seconds: byDay.get(date) ?? 0 })
+      cursor.setDate(cursor.getDate() + 1)
+    }
+    return result
   }
 
   /**

@@ -118,6 +118,12 @@ export interface TaskStat {
   apps: string[]
 }
 
+/** Рабочее время за конкретный день — для целей и серий */
+export interface WorkDayStat {
+  date: string
+  seconds: number
+}
+
 /** Насколько часто срабатывало правило за день — чтобы правила были видны */
 export interface RuleUsage {
   ruleId: number
@@ -186,6 +192,7 @@ export const IPC_CHANNELS = {
   STATS_GET_TAG_STATS: 'stats:getTagStats',
   STATS_GET_WORK: 'stats:getWork',
   STATS_GET_TASKS: 'stats:getTasks',
+  STATS_GET_WORK_BY_DAY: 'stats:getWorkByDay',
   ACTIVITIES_GET_AFK_TIME: 'activities:getAfkTime',
   ACTIVITIES_GET_DAY_COVERAGE: 'activities:getDayCoverage',
   ACTIVITIES_GET_UNTAGGED: 'activities:getUntagged',
@@ -244,6 +251,7 @@ export interface TimeTrackerApi {
     getTagStats: (from: string, to: string) => Promise<TagStat[]>
     getWork: (from: string, to: string) => Promise<WorkAppStat[]>
     getTasks: (from: string, to: string) => Promise<TaskStat[]>
+    getWorkByDay: (from: string, to: string) => Promise<WorkDayStat[]>
   }
   categories: {
     getAll: () => Promise<Category[]>

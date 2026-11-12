@@ -36,7 +36,8 @@ import type {
   TaskStat,
   Meeting,
   UntaggedEntry,
-  RuleUsage
+  RuleUsage,
+  WorkDayStat
 } from '../shared/types'
 import { runMigrations } from './db/migrations'
 import { EventRepository } from './db/event-repository'
@@ -155,6 +156,7 @@ export class DatabaseManager {
   getTagStats(fromDate: string, toDate: string): TagStat[] { return this.stats.getTagStats(fromDate, toDate) }
   getWorkStats(fromDate: string, toDate: string): WorkAppStat[] { return this.stats.getWorkStats(fromDate, toDate) }
   getTaskStats(fromDate: string, toDate: string): TaskStat[] { return this.stats.getTaskStats(fromDate, toDate) }
+  getWorkByDay(fromDate: string, toDate: string): WorkDayStat[] { return this.stats.getWorkByDay(fromDate, toDate) }
 
   // SettingsRepository
   getSetting(key: string): string | null { return this.settings.getSetting(key) }

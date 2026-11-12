@@ -7,7 +7,14 @@ import {
   XAxis,
   YAxis
 } from 'recharts'
-import type { DailyStat, DaySummary, HeatmapCell, Meeting, TagStat } from '../../../shared/types'
+import type {
+  DailyStat,
+  DaySummary,
+  HeatmapCell,
+  Meeting,
+  TagStat,
+  WorkDayStat
+} from '../../../shared/types'
 import { formatDuration, formatLocalDate, formatShort } from '../lib/format'
 import { TAG_CONFIG } from '../lib/tags'
 import { METRIC } from '../lib/colors'
@@ -52,6 +59,8 @@ export default function WeekView(): JSX.Element {
   const [meetCurrent, setMeetCurrent] = useState<Meeting[]>([])
   const [meetPrev, setMeetPrev] = useState<Meeting[]>([])
   const [showHeatmap, setShowHeatmap] = useState(false)
+  const [workDays, setWorkDays] = useState<WorkDayStat[]>([])
+  const [goalSeconds, setGoalSeconds] = useState(0)
 
   useEffect(() => {
     Promise.all([
@@ -61,8 +70,10 @@ export default function WeekView(): JSX.Element {
       window.api.stats.getTopApps(from, today, 10),
       window.api.stats.getHeatmap(from, today),
       window.api.meetings.getRange(from, today),
-      window.api.meetings.getRange(prevFrom, prevTo)
-    ]).then(([d, tc, tp, top, heat, mc, mp]) => {
+      window.api.meetings.getRange(prevFrom, prevTo),
+      window.api.stats.getWorkByDay(shiftDate(-29), today),
+      window.api.settings.get('dailyWorkGoal')
+    ]).then(([d, tc, tp, top, heat, mc, mp, wd, goal]) => {
       setDaily(d)
       setTagCurrent(tc)
       setTagPrev(tp)
@@ -70,6 +81,9 @@ export default function WeekView(): JSX.Element {
       setHeatmap(heat)
       setMeetCurrent(mc)
       setMeetPrev(mp)
+      setWorkDays(wd as WorkDayStat[])
+      const goalMinutes = typeof goal === 'number' ? goal : parseInt(String(goal ?? '0')) || 0
+      setGoalSeconds(goalMinutes * 60)
     })
   }, [from, today, prevFrom, prevTo])
 
@@ -97,6 +111,25 @@ export default function WeekView(): JSX.Element {
       untagged: byTag('untagged')
     }
   })
+
+  // Серия: сегодня ещё идёт, поэтому не рвём серию из-за незакрытого дня
+  const streak = ((): number => {
+    if (goalSeconds <= 0) return 0
+    let count = 0
+    for (let i = workDays.length - 1; i >= 0; i--) {
+      const met = workDays[i].seconds >= goalSeconds
+      if (met) count++
+      else if (i === workDays.length - 1) continue
+      else break
+    }
+    return count
+  })()
+
+  const weekWork = weekRows.reduce(
+    (sum, row) => sum + (workDays.find((d) => d.date === row.date)?.seconds ?? 0),
+    0
+  )
+  const weekGoal = goalSeconds * 7
 
   return (
     <div className="space-y-5">
@@ -144,6 +177,31 @@ export default function WeekView(): JSX.Element {
           Дельты появятся, когда наберётся прошлая неделя: тогда же станет видно, растем
           или падаем.
         </p>
+      )}
+
+      {goalSeconds > 0 && (
+        <section className="rounded-lg border border-tt-border bg-tt-surface p-5">
+          <div className="mb-1 flex items-baseline justify-between text-xs">
+            <span className="text-tt-muted">
+              Цель недели{' '}
+              <span className="text-tt-text">{formatDuration(weekGoal)}</span> — сделано{' '}
+              <span style={{ color: METRIC.work }}>{formatDuration(weekWork)}</span>
+            </span>
+            <span className="text-tt-muted">
+              серия <span className="text-tt-text">{streak}</span>{' '}
+              {streak === 1 ? 'день' : streak >= 2 && streak <= 4 ? 'дня' : 'дней'} подряд
+            </span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded bg-tt-bg">
+            <div
+              className="h-full rounded"
+              style={{
+                width: `${Math.min((weekWork / weekGoal) * 100, 100)}%`,
+                backgroundColor: METRIC.work
+              }}
+            />
+          </div>
+        </section>
       )}
 
       {/* Распределение по дням */}
