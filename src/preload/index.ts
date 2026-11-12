@@ -47,7 +47,8 @@ const api = {
   rules: {
     getAll: () => ipcRenderer.invoke(IPC_CHANNELS.RULES_GET_ALL),
     upsert: (rule: unknown) => ipcRenderer.invoke(IPC_CHANNELS.RULES_UPSERT, rule),
-    delete: (id: number) => ipcRenderer.invoke(IPC_CHANNELS.RULES_DELETE, id)
+    delete: (id: number) => ipcRenderer.invoke(IPC_CHANNELS.RULES_DELETE, id),
+    getUsage: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.RULES_GET_USAGE, date)
   },
   settings: {
     get: (key: string) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET, key),

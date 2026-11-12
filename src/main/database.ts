@@ -35,7 +35,8 @@ import type {
   WorkAppStat,
   TaskStat,
   Meeting,
-  UntaggedEntry
+  UntaggedEntry,
+  RuleUsage
 } from '../shared/types'
 import { runMigrations } from './db/migrations'
 import { EventRepository } from './db/event-repository'
@@ -134,6 +135,7 @@ export class DatabaseManager {
   getCategoryRules(): CategoryRule[] { return this.categories.getCategoryRules() }
   upsertRule(rule: Partial<CategoryRule>): CategoryRule { return this.categories.upsertRule(rule) }
   deleteRule(id: number): void { this.categories.deleteRule(id) }
+  getRuleUsage(date: string): RuleUsage[] { return this.categories.getRuleUsage(date) }
   categorizeEvent(
     appName: string,
     windowTitle: string,

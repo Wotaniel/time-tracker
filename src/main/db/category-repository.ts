@@ -7,10 +7,11 @@
  * - categorizeEvent() — применение правил к событию
  */
 import type Database from 'better-sqlite3'
-import type { Category, CategoryRule } from '../../shared/types'
+import type { Category, CategoryRule, RuleUsage } from '../../shared/types'
 import {
   rowToCategory,
   rowToRule,
+  localDayBounds,
   type RawCategoryRow,
   type RawRuleRow
 } from './helpers'
@@ -154,6 +155,63 @@ export class CategoryRepository {
   /**
    * Проверяет совпадение значения по типу match.
    */
+  /**
+   * Сколько раз каждое правило сработало за день.
+   *
+   * Зачем: правила применяются при вставке события, и результата не видно
+   * нигде — пользователь не понимает, работают они или нет. Здесь видно
+   * и количество совпадений, и сколько времени они покрыли.
+   */
+  getRuleUsage(date: string): RuleUsage[] {
+    const { start, end } = localDayBounds(date)
+    const rules = this.db
+      .prepare('SELECT * FROM category_rules ORDER BY id ASC')
+      .all() as RawRuleRow[]
+
+    const events = this.db
+      .prepare(`
+        SELECT app_name, window_title, app_bundle, url, duration
+        FROM events
+        WHERE ts_start <= ? AND ts_end >= ? AND is_afk = 0
+      `)
+      .all(end, start) as {
+      app_name: string
+      window_title: string
+      app_bundle: string | null
+      url: string | null
+      duration: number
+    }[]
+
+    const usage = new Map<number, { matches: number; seconds: number }>()
+
+    for (const event of events) {
+      for (const rule of rules) {
+        const fieldValue =
+          rule.field === 'app_name'
+            ? event.app_name
+            : rule.field === 'window_title'
+              ? event.window_title
+              : rule.field === 'app_bundle'
+                ? (event.app_bundle ?? '')
+                : (event.url ?? '')
+
+        if (this.matchRule(rule.match_type, rule.value, fieldValue)) {
+          const current = usage.get(rule.id) ?? { matches: 0, seconds: 0 }
+          current.matches += 1
+          current.seconds += event.duration
+          usage.set(rule.id, current)
+          break
+        }
+      }
+    }
+
+    return [...usage.entries()].map(([ruleId, value]) => ({
+      ruleId,
+      matches: value.matches,
+      seconds: value.seconds
+    }))
+  }
+
   private matchRule(matchType: string, pattern: string, value: string): boolean {
     switch (matchType) {
       case 'equals':

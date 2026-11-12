@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
-import type { Category, CategoryRule } from '../../../shared/types'
+import type { Category, CategoryRule, RuleUsage } from '../../../shared/types'
 
 /**
  * Правила и категории.
@@ -43,11 +43,22 @@ export function RulesSection(): JSX.Element {
   const [ruleMatch, setRuleMatch] = useState<CategoryRule['matchType']>('contains')
   const [ruleValue, setRuleValue] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [usage, setUsage] = useState<RuleUsage[]>([])
 
   const reload = (): void => {
-    Promise.all([window.api.categories.getAll(), window.api.rules.getAll()]).then(([c, r]) => {
+    const today = new Date()
+    const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
+      today.getDate()
+    ).padStart(2, '0')}`
+
+    Promise.all([
+      window.api.categories.getAll(),
+      window.api.rules.getAll(),
+      window.api.rules.getUsage(date)
+    ]).then(([c, r, u]) => {
       setCategories(c)
       setRules(r)
+      setUsage(u)
       setRuleCategory((prev) => prev ?? c[0]?.id ?? null)
     })
   }
@@ -56,6 +67,9 @@ export function RulesSection(): JSX.Element {
 
   const categoryName = (id: number): string =>
     categories.find((c) => c.id === id)?.name ?? '—'
+
+  const usageFor = (ruleId: number): RuleUsage | undefined =>
+    usage.find((u) => u.ruleId === ruleId)
 
   const addCategory = async (): Promise<void> => {
     const name = newCategory.trim()
@@ -145,7 +159,8 @@ export function RulesSection(): JSX.Element {
           Правила автоматизации
         </h2>
         <p className="mt-1 text-[11px] text-tt-muted">
-          Первое совпавшее правило выигрывает. Значения проверяются по порядку добавления.
+          Первое совпавшее правило выигрывает. Справа — сколько раз правило сработало сегодня
+          и сколько времени покрыло.
         </p>
 
         <div className="mt-2 divide-y divide-tt-border/50 rounded-md border border-tt-border">
@@ -164,6 +179,14 @@ export function RulesSection(): JSX.Element {
                 {rule.value}
               </span>
               <span className="shrink-0 text-tt-accent">→ {categoryName(rule.categoryId)}</span>
+              <span className="w-24 shrink-0 text-right text-[10px] text-tt-muted">
+                {(() => {
+                  const used = usageFor(rule.id)
+                  if (!used) return 'не срабатывало'
+                  const minutes = Math.round(used.seconds / 60)
+                  return `${used.matches}× · ${minutes}м`
+                })()}
+              </span>
               <button
                 onClick={() => void removeRule(rule.id)}
                 className="shrink-0 text-tt-muted hover:text-tt-red"
