@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Work time ignored the browser** — «Сегодня» computed work from the app tag only, while «Неделя» used the app **or domain** tag. Because Brave itself is untagged but `jira.int.agrd.dev`, `figma.com` and `github.com` are tagged work, the day card showed 171 min where the week card showed 247. Work is now counted by app **or domain** everywhere, and the «только работа» filter shows each app's work share instead of its whole time
+
 ### Added
 - **Calls are detected beyond Google Meet** — the detector only knew Meet URLs, so a Slack huddle was invisible even though it is the same parallel conversation. New `src/main/meeting-detect.ts` recognises Meet by link (and no longer treats `meet.google.com/home` as a call), Slack by the `Huddle:` window title (the real one: `Huddle: @person - company - Slack 🎤`, not `Huddle Preview`), Zoom by a `Zoom Meeting`/`Zoom Webinar` window, and Teams by an explicit meeting window. The source is written into the meeting interval. Rules live in one testable place: 12 tests, including titles taken from the real database. For Teams the rule is deliberately conservative — a topic-only window looks exactly like a chat, so a missed call is preferred over a phantom one
 

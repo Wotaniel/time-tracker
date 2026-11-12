@@ -14,7 +14,7 @@ import type {
 import { formatDuration, formatLocalDate } from '../lib/format'
 import { AppIcon } from '../lib/app-icons'
 import { TagBadge, TagMenu, tagColor, useAppTags } from '../lib/tags'
-import { groupByDomain, isBrowser } from '../lib/domains'
+import { extractDomain, groupByDomain, isBrowser } from '../lib/domains'
 import { mergeMeetings, meetingSeconds } from '../lib/meetings'
 import { DayLane } from '../components/DayLane'
 import { EventList } from '../components/EventList'
@@ -89,11 +89,29 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
   const totalActive = summary.reduce((sum, item) => sum + item.totalTime, 0)
   const meetingTime = mergedMeetings.reduce((sum, m) => sum + meetingSeconds(m), 0)
 
-  const workApps = summary.filter((item) => tags.get(`app:${item.appName}`) === 'work')
-  const workTime = workApps.reduce((sum, item) => sum + item.totalTime, 0)
+  // Работа = тег приложения ИЛИ тег домена. Раньше учитывался только тег
+  // приложения, поэтому вся работа в браузере (jira, figma.com, github) не
+  // попадала в цифру: «Сегодня» показывало 171 мин там, где «Неделя» — 247.
+  const workByApp = new Map<string, number>()
+  for (const item of summary) {
+    if (tags.get(`app:${item.appName}`) === 'work') {
+      workByApp.set(item.appName, item.totalTime)
+      continue
+    }
+    let seconds = 0
+    for (const win of item.windows) {
+      const domain = extractDomain(win.url)
+      if (domain && tags.get(`domain:${domain}`) === 'work') seconds += win.totalTime
+    }
+    if (seconds > 0) workByApp.set(item.appName, seconds)
+  }
 
-  const visible = filter === 'work' ? workApps : summary
-  const maxTime = visible[0]?.totalTime ?? 1
+  const workTime = [...workByApp.values()].reduce((sum, seconds) => sum + seconds, 0)
+
+  const visible = filter === 'work' ? summary.filter((item) => workByApp.has(item.appName)) : summary
+  const secondsFor = (item: DetailedDaySummary): number =>
+    filter === 'work' ? workByApp.get(item.appName) ?? 0 : item.totalTime
+  const maxTime = Math.max(...visible.map(secondsFor), 1)
 
   // Браузер как приложение не показываем: его время уже разложено по доменам
   const untaggedRows = untagged.filter(
@@ -277,6 +295,7 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
               <AppRow
                 key={`${item.appName}-${idx}`}
                 item={item}
+                seconds={secondsFor(item)}
                 maxTime={maxTime}
                 tags={tags}
                 onSetTag={setTag}
@@ -355,12 +374,14 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
 
 function AppRow({
   item,
+  seconds,
   maxTime,
   tags,
   onSetTag,
   onDeleteTag
 }: {
   item: DetailedDaySummary
+  seconds: number
   maxTime: number
   tags: Map<string, TagType>
   onSetTag: (targetType: TagTargetType, targetKey: string, tag: TagType) => Promise<void>
@@ -371,7 +392,7 @@ function AppRow({
   const detailCount = browser ? groupByDomain(item.windows).length : item.windows.length
   const hasDetail = detailCount > 1
   const appTag = tags.get(`app:${item.appName}`)
-  const barWidth = (item.totalTime / maxTime) * 100
+  const barWidth = (seconds / maxTime) * 100
 
   return (
     <div className="border-b border-tt-border/60 last:border-b-0">
@@ -405,7 +426,7 @@ function AppRow({
           </div>
         </div>
         <span className="w-16 text-right text-sm tabular-nums text-tt-muted">
-          {formatDuration(item.totalTime)}
+          {formatDuration(seconds)}
         </span>
         <TagMenu
           currentTag={appTag}
