@@ -200,6 +200,23 @@ function AppInner(): JSX.Element {
  * поэтому текст должен называть именно ту, что случилась.
  */
 function BlockedBanner({ health }: { health: TrackingHealthStatus }): JSX.Element {
+  if (health.blockedBy === 'window-access') {
+    return (
+      <div className="mb-4 flex items-start gap-3 rounded-lg border border-tt-red/40 bg-tt-red/10 p-4">
+        <AlertTriangle size={18} className="mt-0.5 shrink-0 text-tt-red" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">Активное окно не читается — трекинг не пишет данные</p>
+          <p className="mt-1 text-xs text-tt-muted">
+            Разрешение есть, но система больше не отдаёт список окон: обычно это отозванный
+            доступ «Запись экрана» или зависший системный помощник. Проверьте
+            Системные настройки → Конфиденциальность и безопасность → Запись экрана
+            и Запись системного аудио, затем перезапустите CarpeDiem.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   if (health.blockedBy === 'bundle-integrity') {
     return (
       <div className="mb-4 flex items-start gap-3 rounded-lg border border-tt-red/40 bg-tt-red/10 p-4">

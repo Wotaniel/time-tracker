@@ -25,6 +25,12 @@ function isSelfActivity(win: NonNullable<Awaited<ReturnType<typeof activeWin>>>)
 /** Как часто пишем прогресс открытого события, чтобы сводки были живыми */
 const PROGRESS_INTERVAL_MS = 5000
 
+/** Сколько может идти один тик, прежде чем считаем его зависшим */
+const POLL_STALL_MS = 10_000
+
+/** После стольких неудачных опросов подряд считаем, что окна не читаются */
+const POLL_FAILURE_LIMIT = 10
+
 /** Приложения, которые появляются когда экран заблокирован / скринсейвер.
  * active-win на macOS возвращает loginwindow когда экран залочен,
  * ScreenSaverEngine — когда активен скринсейвер. Это не реальная активность. */
@@ -76,6 +82,9 @@ export class TrackingEngine extends EventEmitter {
   private excludedApps: Set<string> = new Set()
   private hasAccessibilityPermission: boolean = false
   private lastProgressAt: number = 0
+  private pollInFlight = false      // защита от наложения тиков poll()
+  private pollStartedAt = 0
+  private activeWinFailures = 0     // подряд неудачных опросов активного окна
 
   // ─── Google Meet background tracking ────────────────────
   // Когда созвон активен (meet.google.com в foreground),
@@ -316,7 +325,34 @@ export class TrackingEngine extends EventEmitter {
 
   // ─── Core polling ────────────────────────────────────────────
 
+  /**
+   * Обёртка тика. Без неё зависший вызов activeWin() превращался в катастрофу:
+   * setInterval продолжал спавнить хелперы, каждый блокировался на проверке
+   * разрешений, и за минуты накапливались десятки висящих процессов — трекер
+   * молча переставал писать. Здесь одновременно выполняется не больше одного тика,
+   * а зависший тик снимается сторожевым таймером.
+   */
   private async poll(): Promise<void> {
+    if (this.pollInFlight) {
+      const stuckMs = Date.now() - this.pollStartedAt
+      if (stuckMs > POLL_STALL_MS) {
+        log.error(`[TrackingEngine] Тик висит ${Math.round(stuckMs / 1000)} с — снимаю его`)
+        this.pollInFlight = false
+        this.reportWindowAccess(false)
+      }
+      return
+    }
+
+    this.pollInFlight = true
+    this.pollStartedAt = Date.now()
+    try {
+      await this.pollOnce()
+    } finally {
+      this.pollInFlight = false
+    }
+  }
+
+  private async pollOnce(): Promise<void> {
     try {
       if (this.isPaused || this.isAfk) return
 
@@ -328,8 +364,20 @@ export class TrackingEngine extends EventEmitter {
       let win: Awaited<ReturnType<typeof activeWin>>
       try {
         win = await activeWin()
+        this.activeWinFailures = 0
+        this.reportWindowAccess(true)
       } catch (err) {
-        log.error('[TrackingEngine] activeWin error:', err)
+        this.activeWinFailures += 1
+        // Логируем первую неудачу и дальше раз в минуту, а не каждую секунду
+        if (this.activeWinFailures === 1 || this.activeWinFailures % 60 === 0) {
+          log.error(
+            `[TrackingEngine] activeWin error (подряд ${this.activeWinFailures}):`,
+            err
+          )
+        }
+        if (this.activeWinFailures >= POLL_FAILURE_LIMIT) {
+          this.reportWindowAccess(false)
+        }
         return
       }
 
@@ -458,6 +506,14 @@ export class TrackingEngine extends EventEmitter {
       isAfk: false,
       isPrivate: false
     })
+  }
+
+  /**
+   * Сообщает наружу, что активное окно не читается (зависший хелпер active-win,
+   * отозванное разрешение). Без этого трекер умирал молча — как это уже случалось.
+   */
+  private reportWindowAccess(ok: boolean): void {
+    this.emit('window-access', ok)
   }
 
   /**

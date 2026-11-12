@@ -146,7 +146,7 @@ export interface HeatmapCell {
  * Без этого состояния поломка выглядит как «работающее приложение с пустой лентой»,
  * поэтому UI обязан показывать её явно.
  */
-export type TrackingBlockReason = 'accessibility' | 'bundle-integrity'
+export type TrackingBlockReason = 'accessibility' | 'bundle-integrity' | 'window-access'
 
 export interface TrackingHealthStatus {
   /** Трекер пишет данные прямо сейчас */
