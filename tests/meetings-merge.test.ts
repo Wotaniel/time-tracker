@@ -53,10 +53,18 @@ describe('mergeMeetings', () => {
     expect(merged).toHaveLength(2)
   })
 
-  it('не склеивает один звонок с разрывом больше 10 минут', () => {
+  it('склеивает звонок с разрывом до 20 минут (сигнал теряется, звонок нет)', () => {
     const merged = mergeMeetings([
       meeting(1, t(13, 0), t(13, 20), 'https://meet.google.com/cqu-vfcz-ftv'),
       meeting(2, t(13, 40), t(13, 50), 'https://meet.google.com/cqu-vfcz-ftv')
+    ])
+    expect(merged).toHaveLength(1)
+  })
+
+  it('не склеивает звонки с большим разрывом', () => {
+    const merged = mergeMeetings([
+      meeting(1, t(13, 0), t(13, 20), 'https://meet.google.com/cqu-vfcz-ftv'),
+      meeting(2, t(14, 30), t(14, 50), 'https://meet.google.com/cqu-vfcz-ftv')
     ])
     expect(merged).toHaveLength(2)
   })

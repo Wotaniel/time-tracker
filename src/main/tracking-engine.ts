@@ -87,7 +87,13 @@ export class TrackingEngine extends EventEmitter {
   private lastMeetingWrite: number = 0
   private meetingSource: DetectedMeeting['source'] | null = null
   private lastMeetingScan: number = 0
-  private readonly MEETING_TIMEOUT_MS = 10 * 60 * 1000 // страховка: 10 мин без признаков
+  /**
+   * Meet живёт во вкладке браузера, а в списке окон виден только заголовок
+   * активной вкладки. Пока вы работаете в другом окне, сигнала нет вообще —
+   * это норма, а не конец звонка. 20 минут покрывают рабочие переключения,
+   * не растягивая звонок на полдня.
+   */
+  private readonly MEETING_TIMEOUT_MS = 20 * 60 * 1000
   /** Окно созвона пропало → он закончился. Хаддл/Zoom/Teams видны в списке окон */
   private readonly MEETING_GONE_MS = 45_000
   /** Как часто смотрим список открытых окон */
