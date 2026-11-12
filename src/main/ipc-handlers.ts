@@ -400,6 +400,8 @@ const ALLOWED_SETTING_KEYS = new Set([
   'excludedApps',
   'idleThreshold',
   'dailyWorkGoal',
+  'locationLat',
+  'locationLon',
 ])
 
 function assertSettingKey(key: string): void {

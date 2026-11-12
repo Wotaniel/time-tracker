@@ -18,6 +18,7 @@ import { TagBadge, TagMenu, tagColor, useAppTags } from '../lib/tags'
 import { METRIC } from '../lib/colors'
 import { extractDomain, groupByDomain, isBrowser } from '../lib/domains'
 import { mergeMeetings, meetingSeconds } from '../../../shared/meetings'
+import { sunTimes, type SunTimes } from '../../../shared/sun'
 import { DayLane } from '../components/DayLane'
 import { EventList } from '../components/EventList'
 
@@ -42,6 +43,7 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
   const [untagged, setUntagged] = useState<UntaggedEntry[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [goalSeconds, setGoalSeconds] = useState(0)
+  const [location, setLocation] = useState<{ lat: number; lon: number } | null>(null)
   const { tags, setTag, deleteTag } = useAppTags()
 
   // Всё, что показывает день, обновляется вместе: раньше созвоны и покрытие
@@ -74,6 +76,15 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
       const minutes = typeof value === 'number' ? value : parseInt(String(value ?? '0')) || 0
       setGoalSeconds(minutes * 60)
     })
+    Promise.all([window.api.settings.get('locationLat'), window.api.settings.get('locationLon')]).then(
+      ([lat, lon]) => {
+        const latNum = typeof lat === 'number' ? lat : parseFloat(String(lat ?? ''))
+        const lonNum = typeof lon === 'number' ? lon : parseFloat(String(lon ?? ''))
+        if (Number.isFinite(latNum) && Number.isFinite(lonNum)) {
+          setLocation({ lat: latNum, lon: lonNum })
+        }
+      }
+    )
   }, [])
 
   const categoryById = new Map(categories.map((c) => [c.id, c]))
@@ -107,6 +118,10 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
 
   // Перезапуск приложения рвал один звонок на два интервала — склеиваем соседние
   const mergedMeetings = mergeMeetings(meetings)
+
+  const sun: SunTimes | null = location
+    ? sunTimes(selectedDate, location.lat, location.lon)
+    : null
 
   const totalActive = summary.reduce((sum, item) => sum + item.totalTime, 0)
   const meetingTime = mergedMeetings.reduce((sum, m) => sum + meetingSeconds(m), 0)
@@ -265,6 +280,7 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
           date={selectedDate}
           tagFor={tagFor}
           categoryFor={categoryFor}
+          sun={sun}
         />
       </section>
 
