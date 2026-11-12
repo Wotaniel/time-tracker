@@ -1,4 +1,4 @@
-import { ipcMain, dialog, BrowserWindow, app } from 'electron'
+import { ipcMain, dialog, BrowserWindow, app, clipboard } from 'electron'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
@@ -8,6 +8,8 @@ import type { AFKDetector } from './afk-detector'
 import type { TrackingHealth } from './tracking-health'
 import { getAppIcon } from './app-icons'
 import { validateDate } from './validation'
+import { buildPeriodReport } from '../shared/report'
+import { mergeMeetings, meetingSeconds } from '../shared/meetings'
 import { IPC_CHANNELS, type Category, type CategoryRule, type TagTargetType, type TagType } from '../shared/types'
 
 /**
@@ -165,6 +167,44 @@ export function registerIpcHandlers(
       }
     }
   )
+
+  // ─── Отчёт текстом ─────────────────────────────────────────
+
+  ipcMain.handle(IPC_CHANNELS.REPORT_COPY_WEEK, (_event, from: string, to: string) => {
+    validateDate(from)
+    validateDate(to)
+
+    const events = db.getEventsByRange(from, to)
+    const activeSeconds = events.filter((e) => !e.isAfk).reduce((sum, e) => sum + e.duration, 0)
+    const afkSeconds = events.filter((e) => e.isAfk).reduce((sum, e) => sum + e.duration, 0)
+
+    const workByDay = db.getWorkByDay(from, to)
+    const meetings = mergeMeetings(db.getMeetingsByRange(from, to))
+    const goalMinutes = db.getSetting('dailyWorkGoal')
+    const goalSecondsPerDay = (goalMinutes ? parseInt(goalMinutes) || 0 : 0) * 60
+
+    const text = buildPeriodReport({
+      from,
+      to,
+      activeSeconds,
+      workSeconds: workByDay.reduce((sum, day) => sum + day.seconds, 0),
+      meetingSeconds: meetings.reduce((sum, meeting) => sum + meetingSeconds(meeting), 0),
+      afkSeconds,
+      goalSecondsPerDay,
+      workByDay,
+      topApps: db.getTopApps(from, to, 5).map((app) => ({
+        appName: app.appName,
+        totalTime: app.totalTime
+      })),
+      tasks: db
+        .getTaskStats(from, to)
+        .slice(0, 5)
+        .map((task) => ({ taskKey: task.taskKey, seconds: task.seconds }))
+    })
+
+    clipboard.writeText(text)
+    return text
+  })
 
   // ─── Export ────────────────────────────────────────────────
 

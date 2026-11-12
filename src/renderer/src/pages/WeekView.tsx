@@ -61,6 +61,7 @@ export default function WeekView(): JSX.Element {
   const [showHeatmap, setShowHeatmap] = useState(false)
   const [workDays, setWorkDays] = useState<WorkDayStat[]>([])
   const [goalSeconds, setGoalSeconds] = useState(0)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -133,11 +134,25 @@ export default function WeekView(): JSX.Element {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-lg font-medium">Неделя</h1>
-        <p className="text-xs text-tt-muted">
-          {from} — {today} · сравнение с {prevFrom} — {prevTo}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-lg font-medium">Неделя</h1>
+          <p className="text-xs text-tt-muted">
+            {from} — {today} · сравнение с {prevFrom} — {prevTo}
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            window.api.report.copyWeek(from, today).then(() => {
+              setCopied(true)
+              setTimeout(() => setCopied(false), 2000)
+            })
+          }}
+          className="no-drag shrink-0 rounded-md border border-tt-border px-3 py-1.5 text-xs hover:bg-tt-surface"
+          title="Скопировать текстовый отчёт за неделю в буфер"
+        >
+          {copied ? 'скопировано ✓' : 'скопировать отчёт'}
+        </button>
       </div>
 
       {/* Четыре KPI с дельтой */}

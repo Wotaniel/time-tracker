@@ -60,6 +60,9 @@ const api = {
     csv: (from: string, to: string) => ipcRenderer.invoke(IPC_CHANNELS.EXPORT_CSV, from, to),
     json: (from: string, to: string) => ipcRenderer.invoke(IPC_CHANNELS.EXPORT_JSON, from, to)
   },
+  report: {
+    copyWeek: (from: string, to: string) => ipcRenderer.invoke(IPC_CHANNELS.REPORT_COPY_WEEK, from, to)
+  },
   apps: {
     getIcon: (appName: string, bundleId?: string) => ipcRenderer.invoke(IPC_CHANNELS.APPS_GET_ICON, appName, bundleId)
   },

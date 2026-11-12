@@ -212,6 +212,7 @@ export const IPC_CHANNELS = {
   TRACKING_RESUME: 'tracking:resume',
   EXPORT_CSV: 'export:csv',
   EXPORT_JSON: 'export:json',
+  REPORT_COPY_WEEK: 'report:copyWeek',
   APPS_GET_ICON: 'apps:getIcon',
   TAGS_GET_ALL: 'tags:getAll',
   TAGS_SET: 'tags:set',
@@ -271,6 +272,10 @@ export interface TimeTrackerApi {
   export: {
     csv: (from: string, to: string) => Promise<string>
     json: (from: string, to: string) => Promise<string>
+  }
+  report: {
+    /** Собирает текстовый отчёт за период, кладёт в буфер и возвращает его */
+    copyWeek: (from: string, to: string) => Promise<string>
   }
   apps: {
     getIcon: (appName: string, bundleId?: string) => Promise<string | null>
