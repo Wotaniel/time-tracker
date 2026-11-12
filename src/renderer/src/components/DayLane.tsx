@@ -34,6 +34,13 @@ const MAX_VIEW_MS = DAY_MS
 /** Шаг колеса: 20% за щелчок */
 const ZOOM_STEP = 1.2
 
+/** Заголовок созвона: имя встречи, для хаддла — с кем */
+function meetingLabel(meeting: Meeting): string {
+  if (meeting.source === 'Slack huddle' && meeting.title) return `Созвон в Slack: ${meeting.title}`
+  if (meeting.title) return meeting.title
+  return meeting.source ?? 'Созвон'
+}
+
 /** Короткая подпись встречи: meet.google.com/meet/abc-defg-hij → abc-defg-hij */
 function meetingCode(url: string | null): string | null {
   if (!url) return null
@@ -121,10 +128,13 @@ export function DayLane({
         ...geometry,
         hoverInfo: {
           leftPct: geometry.left + geometry.width / 2,
-          title: `Созвон — ${formatDuration(Math.round((to - from) / 1000))}`,
+          title: meetingLabel(m),
           meta: [
-            `${formatTimeSec(m.tsStart)}–${m.tsEnd ? formatTimeSec(m.tsEnd) : 'сейчас'}`,
+            `${formatTimeSec(m.tsStart)}–${m.tsEnd ? formatTimeSec(m.tsEnd) : 'сейчас'} · ${formatDuration(
+              Math.round((to - from) / 1000)
+            )}`,
             ...(m.title ? [m.title] : []),
+            ...(m.source ? [`источник: ${m.source}`] : []),
             ...(code ? [`код встречи: ${code}`] : []),
             'не входит в активность, наложен сверху'
           ]

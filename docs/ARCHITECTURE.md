@@ -56,7 +56,7 @@ React 18, TypeScript (strict), better-sqlite3, Vite + Tailwind. Около 6 900
 | таблица | назначение |
 |---|---|
 | `events` | активность: `ts_start`, `ts_end`, `duration`, `app_name`, `app_bundle`, `window_title`, `url`, `category_id`, `task_key`, `is_afk`, `is_private` |
-| `meetings` | созвоны отдельно от времени: `ts_start`, `ts_end` (NULL, пока идёт), `url`, `title` (источник) |
+| `meetings` | созвоны отдельно от времени: `ts_start`, `ts_end` (NULL, пока идёт), `url`, `source` (чем поймали), `title` (название встречи или участник хаддла) |
 | `categories` | категории продуктивности: `name`, `color`, `productivity` |
 | `category_rules` | правила категоризации: `field`, `match_type`, `value` → категория, первое совпадение выигрывает |
 | `app_tags` | теги work/neutral/distracting по приложению или домену |

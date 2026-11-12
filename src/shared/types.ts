@@ -59,6 +59,9 @@ export interface Meeting {
   tsStart: string
   tsEnd: string | null // null — созвон ещё идёт
   url: string | null
+  /** Чем поймали: «Google Meet», «Slack huddle», «Zoom», «Microsoft Teams» */
+  source: string | null
+  /** Название встречи; для хаддла — участник */
   title: string | null
 }
 

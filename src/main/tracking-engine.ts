@@ -294,7 +294,8 @@ export class TrackingEngine extends EventEmitter {
         this.meetingId = this.db.startMeeting(
           new Date(now).toISOString(),
           detected.url,
-          detected.source
+          detected.source,
+          detected.title
         )
         this.lastMeetingWrite = now
         log.info(`[TrackingEngine] Meeting started (${detected.source})`)

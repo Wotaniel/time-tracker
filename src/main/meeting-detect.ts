@@ -20,6 +20,28 @@ export interface DetectedMeeting {
   source: MeetingSource
   /** Ссылка или код встречи, если есть */
   url: string | null
+  /** Название встречи, если его видно в заголовке окна */
+  title: string | null
+}
+
+/**
+ * Название из заголовка вкладки Meet: «Meet - Design call» → «Design call».
+ * Ограничение Google Meet режет длинные названия многоточием — оставляем как есть.
+ */
+export function meetTitleFromTab(title: string): string | null {
+  const match = title.trim().match(/^meet\s*[-–—:]\s*(.+)$/i)
+  const value = match?.[1]?.trim()
+  return value ? value : null
+}
+
+/** Участник хаддла: «Huddle: @Dmitriy Akhromeyko - Company - Slack 🎤» */
+export function huddleParticipant(title: string): string | null {
+  const match = title.match(/^huddle:\s*(.+)$/i)
+  if (!match) return null
+  // Хвост вида «- AdGuard Software Ltd - Slack 🎤» отрезаем по первому « - »
+  const first = match[1].split(/\s+-\s+/)[0]
+  const cleaned = first.replace(/^@/, '').trim()
+  return cleaned || null
 }
 
 /**
@@ -83,23 +105,23 @@ function isMeetByTitle(title: string): boolean {
 export function detectMeeting(win: WindowInfo): DetectedMeeting | null {
   const code = meetCode(win.url)
   if (code) {
-    return { source: 'Google Meet', url: win.url }
+    return { source: 'Google Meet', url: win.url, title: meetTitleFromTab(win.windowTitle) }
   }
 
   if (isMeetByTitle(win.windowTitle)) {
-    return { source: 'Google Meet', url: null }
+    return { source: 'Google Meet', url: null, title: meetTitleFromTab(win.windowTitle) }
   }
 
   if (isSlackHuddle(win.appName, win.windowTitle)) {
-    return { source: 'Slack huddle', url: null }
+    return { source: 'Slack huddle', url: null, title: huddleParticipant(win.windowTitle) }
   }
 
   if (isZoomMeeting(win.appName, win.windowTitle)) {
-    return { source: 'Zoom', url: null }
+    return { source: 'Zoom', url: null, title: null }
   }
 
   if (isTeamsMeeting(win.appName, win.windowTitle)) {
-    return { source: 'Microsoft Teams', url: null }
+    return { source: 'Microsoft Teams', url: null, title: null }
   }
 
   return null

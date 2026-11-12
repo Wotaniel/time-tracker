@@ -35,6 +35,7 @@ export interface RawMeetingRow {
   ts_start: string
   ts_end: string | null
   url: string | null
+  source: string | null
   title: string | null
 }
 

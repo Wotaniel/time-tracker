@@ -16,6 +16,7 @@ function rowToMeeting(row: RawMeetingRow): Meeting {
     tsStart: row.ts_start,
     tsEnd: row.ts_end,
     url: row.url,
+    source: row.source,
     title: row.title
   }
 }
@@ -24,10 +25,15 @@ export class MeetingRepository {
   constructor(private db: Database.Database) {}
 
   /** Открывает интервал созвона. ts_end остаётся NULL, пока звонок идёт */
-  startMeeting(tsStart: string, url: string | null, title: string | null): number {
+  startMeeting(
+    tsStart: string,
+    url: string | null,
+    source: string | null,
+    title: string | null
+  ): number {
     const result = this.db
-      .prepare('INSERT INTO meetings (ts_start, ts_end, url, title) VALUES (?, NULL, ?, ?)')
-      .run(tsStart, url, title)
+      .prepare('INSERT INTO meetings (ts_start, ts_end, url, source, title) VALUES (?, NULL, ?, ?, ?)')
+      .run(tsStart, url, source, title)
     return Number(result.lastInsertRowid)
   }
 

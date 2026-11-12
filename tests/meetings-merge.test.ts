@@ -7,8 +7,8 @@ const meeting = (
   start: string,
   end: string | null,
   url: string | null,
-  title: string | null = 'Google Meet'
-): Meeting => ({ id, tsStart: start, tsEnd: end, url, title })
+  source: string | null = 'Google Meet'
+): Meeting => ({ id, tsStart: start, tsEnd: end, url, source, title: null })
 
 const t = (h: number, m = 0): string => new Date(2026, 10, 12, h, m).toISOString()
 

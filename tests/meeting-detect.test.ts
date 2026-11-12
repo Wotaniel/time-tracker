@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { detectMeeting, detectMeetingAmong } from '../src/main/meeting-detect'
+import {
+  detectMeeting,
+  detectMeetingAmong,
+  huddleParticipant,
+  meetTitleFromTab
+} from '../src/main/meeting-detect'
 
 const win = (appName: string, windowTitle = '', url: string | null = null): ReturnType<typeof detectMeeting> =>
   detectMeeting({ appName, windowTitle, url })
@@ -105,5 +110,38 @@ describe('созвон среди открытых окон', () => {
       ...windows
     ]
     expect(detectMeetingAmong(withZoom)?.source).toBe('Zoom')
+  })
+})
+
+describe('название встречи', () => {
+  it('Meet: берём из заголовка вкладки', () => {
+    // Реальный заголовок из базы событий
+    expect(meetTitleFromTab('Meet - Design call')).toBe('Design call')
+    expect(meetTitleFromTab('Meet — Sprint review')).toBe('Sprint review')
+    expect(meetTitleFromTab('Google Meet')).toBeNull()
+  })
+
+  it('Meet: название попадает в интервал', () => {
+    const detected = detectMeeting({ appName: 'Brave Browser', windowTitle: 'Meet - Design call', url: null })
+    expect(detected?.title).toBe('Design call')
+  })
+
+  it('Slack: участник хаддла без служебного хвоста', () => {
+    // Реальный заголовок из базы
+    expect(huddleParticipant('Huddle: @Dmitriy Akhromeyko - AdGuard Software Ltd - Slack 🎤')).toBe(
+      'Dmitriy Akhromeyko'
+    )
+    expect(huddleParticipant('Huddle: @Maria Ivanova')).toBe('Maria Ivanova')
+    expect(huddleParticipant('Slack - Huddle Preview')).toBeNull()
+  })
+
+  it('Slack: участник сохраняется в интервале, источник отдельно', () => {
+    const detected = detectMeeting({
+      appName: 'Slack',
+      windowTitle: 'Huddle: @Dmitriy Akhromeyko - AdGuard Software Ltd - Slack 🎤',
+      url: null
+    })
+    expect(detected?.source).toBe('Slack huddle')
+    expect(detected?.title).toBe('Dmitriy Akhromeyko')
   })
 })
