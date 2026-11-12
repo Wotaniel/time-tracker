@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The «Без тега» block disappears when the queue is empty** — it used to take a full card to say «Всё размечено», which is noise on a day when there is nothing to triage. The rules entry point stays in Settings
+
 ### Fixed
 - **Work time ignored the browser** — «Сегодня» computed work from the app tag only, while «Неделя» used the app **or domain** tag. Because Brave itself is untagged but `jira.int.agrd.dev`, `figma.com` and `github.com` are tagged work, the day card showed 171 min where the week card showed 247. Work is now counted by app **or domain** everywhere, and the «только работа» filter shows each app's work share instead of its whole time
 
