@@ -115,6 +115,22 @@ describe('getUntagged', () => {
     db.close()
   })
 
+  it('не показывает строку без домена (file://)', () => {
+    const db = createTestDb()
+    const events = new EventRepository(db)
+    const stats = new StatsRepository(db)
+
+    insertEvent(events, {
+      appName: 'Brave Browser',
+      url: 'file:///Users/me/page.html',
+      duration: 60
+    })
+
+    const rows = stats.getUntagged(dayOffset(0))
+    expect(rows.some((r) => r.targetType === 'domain' && r.targetKey === '')).toBe(false)
+    db.close()
+  })
+
   it('исключает размеченный домен и размеченное приложение', () => {
     const db = createTestDb()
     const events = new EventRepository(db)
