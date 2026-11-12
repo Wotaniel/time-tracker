@@ -136,6 +136,14 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
   )
   const untaggedTotal = untaggedRows.reduce((sum, row) => sum + row.seconds, 0)
 
+  // Задачи + остальное + созвоны должны сходиться с рабочим временем:
+  // остальное — это работа, не попавшая ни в одну задачу, без созвонов
+  // (созвоны идут отдельной строкой, чтобы не считать их дважды).
+  const tasksTotal = tasks.reduce((sum, task) => sum + task.seconds, 0)
+  const meetingsInsideWork = Math.min(meetingTime, workTime)
+  const otherWork = Math.max(0, workTime - tasksTotal - meetingsInsideWork)
+  const tasksMax = Math.max(tasksTotal ? tasks[0].seconds : 0, otherWork, meetingsInsideWork, 1)
+
   const today = formatLocalDate(new Date())
   const shiftDate = (days: number): void => {
     const d = new Date(selectedDate)
@@ -348,33 +356,40 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
         </button>
         {showTasks && (
           <div className="border-t border-tt-border px-4 py-3">
-            {tasks.length === 0 ? (
-              <p className="text-xs text-tt-muted">За этот день задач с ключом Jira нет.</p>
-            ) : (
-              <div className="space-y-1.5">
-                {tasks.map((task) => (
-                  <div key={task.taskKey} className="flex items-center gap-3 text-xs">
-                    <a
-                      href={`https://jira.int.agrd.dev/browse/${task.taskKey}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="w-28 shrink-0 text-tt-accent hover:underline"
-                    >
-                      {task.taskKey}
-                    </a>
-                    <div className="h-1.5 flex-1 overflow-hidden rounded bg-tt-bg">
-                      <div
-                        className="h-full rounded bg-tt-green/70"
-                        style={{ width: `${Math.min(task.percentage, 100)}%` }}
-                      />
-                    </div>
-                    <span className="w-16 text-right tabular-nums text-tt-muted">
-                      {formatDuration(task.seconds)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="space-y-1.5">
+              {tasks.map((task) => (
+                <TaskRow
+                  key={task.taskKey}
+                  label={task.taskKey}
+                  seconds={task.seconds}
+                  max={tasksMax}
+                  color={METRIC.work}
+                  href={`https://jira.int.agrd.dev/browse/${task.taskKey}`}
+                />
+              ))}
+
+              <TaskRow
+                label="Остальное"
+                seconds={otherWork}
+                max={tasksMax}
+                color={METRIC.afk}
+                hint="работа без ключа задачи"
+              />
+
+              <TaskRow
+                label="Созвоны"
+                seconds={meetingsInsideWork}
+                max={tasksMax}
+                color={METRIC.meeting}
+                hint="идут параллельно работе, в сумму задач не входят"
+              />
+            </div>
+
+            <p className="mt-2 border-t border-tt-border/60 pt-2 text-[11px] text-tt-muted">
+              Работа за день: <span className="text-tt-text">{formatDuration(workTime)}</span> —
+              задачи {formatDuration(tasksTotal)}, остальное {formatDuration(otherWork)}, созвоны{' '}
+              {formatDuration(meetingsInsideWork)}
+            </p>
           </div>
         )}
       </section>
@@ -394,6 +409,53 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
           </div>
         )}
       </section>
+    </div>
+  )
+}
+
+// ─── Строка задачи/остального/созвонов ─────────────────────────
+
+function TaskRow({
+  label,
+  seconds,
+  max,
+  color,
+  href,
+  hint
+}: {
+  label: string
+  seconds: number
+  max: number
+  color: string
+  href?: string
+  hint?: string
+}): JSX.Element {
+  return (
+    <div className="flex items-center gap-3 text-xs" title={hint}>
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="w-28 shrink-0 truncate text-tt-accent hover:underline"
+        >
+          {label}
+        </a>
+      ) : (
+        <span className="w-28 shrink-0 truncate text-tt-text/80">{label}</span>
+      )}
+      <div className="h-1.5 flex-1 overflow-hidden rounded bg-tt-bg">
+        <div
+          className="h-full rounded"
+          style={{
+            width: `${Math.max((seconds / max) * 100, seconds > 0 ? 0.5 : 0)}%`,
+            backgroundColor: color
+          }}
+        />
+      </div>
+      <span className="w-16 text-right tabular-nums text-tt-muted">
+        {formatDuration(seconds)}
+      </span>
     </div>
   )
 }

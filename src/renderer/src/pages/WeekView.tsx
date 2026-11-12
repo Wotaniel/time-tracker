@@ -11,6 +11,7 @@ import type { DailyStat, DaySummary, HeatmapCell, Meeting, TagStat } from '../..
 import { formatDuration, formatLocalDate, formatShort } from '../lib/format'
 import { TAG_CONFIG } from '../lib/tags'
 import { METRIC } from '../lib/colors'
+import { mergeMeetings, meetingSeconds } from '../../../shared/meetings'
 
 /**
  * «Неделя» — экран анализа, а не второй «Сегодня».
@@ -29,10 +30,8 @@ function shiftDate(days: number): string {
 }
 
 function sumMeetings(meetings: Meeting[]): number {
-  return meetings.reduce((sum, m) => {
-    const end = m.tsEnd ? new Date(m.tsEnd).getTime() : Date.now()
-    return sum + Math.max(0, Math.round((end - new Date(m.tsStart).getTime()) / 1000))
-  }, 0)
+  // Склеиваем так же, как «Сегодня»: иначе KPI недели и день показывают разное
+  return mergeMeetings(meetings).reduce((sum, m) => sum + meetingSeconds(m), 0)
 }
 
 function tagSeconds(stats: TagStat[], tag: TagStat['tag']): number {

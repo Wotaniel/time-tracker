@@ -52,18 +52,34 @@ function domainOf(url) {
   }
 }
 
+/** Код комнаты Meet: один звонок приходит разными ссылками */
+function meetingCode(url) {
+  if (!url) return null
+  const match = url.match(/meet\.google\.com\/(?:meet\/)?([a-z0-9-]{6,})/i)
+  return match ? match[1].toLowerCase() : null
+}
+
+/** Один и тот же звонок? Коды сравниваем, если есть у обоих; иначе — источник */
+function sameCall(a, b) {
+  const codeA = meetingCode(a.url)
+  const codeB = meetingCode(b.url)
+  if (codeA && codeB) return codeA === codeB
+  return (a.title ?? '') === (b.title ?? '')
+}
+
 /**
  * Склеивает соседние интервалы одного созвона: перезапуск приложения рвёт
- * интервал, и один звонок превращается в два.
+ * интервал, а Meet в фоне вообще не виден, поэтому сигнала может не быть
+ * до 20 минут. Живёт по тем же правилам, что интерфейс (src/shared/meetings.ts).
  */
 function mergeMeetings(rows) {
   const result = []
   for (const row of rows) {
     const last = result[result.length - 1]
-    if (last && last.url === row.url) {
+    if (last && sameCall(last, row)) {
       const lastEnd = last.end ? new Date(last.end).getTime() : Date.now()
       const gap = new Date(row.start).getTime() - lastEnd
-      if (gap >= 0 && gap <= 2 * 60 * 1000) {
+      if (gap >= 0 && gap <= 20 * 60 * 1000) {
         if (row.end && (!last.end || row.end > last.end)) last.end = row.end
         continue
       }
@@ -132,7 +148,7 @@ function collect(db, date) {
 
   const meetings = db
     .prepare(`
-      SELECT ts_start AS start, ts_end AS end, url FROM meetings
+      SELECT ts_start AS start, ts_end AS end, url, title FROM meetings
       WHERE ts_start <= @end AND COALESCE(ts_end, ts_start) >= @start
       ORDER BY ts_start
     `)

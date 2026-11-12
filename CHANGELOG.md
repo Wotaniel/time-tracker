@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **«Остальное» and «Созвоны» in the day's tasks** — the task list left you guessing what the rest of the working day was. It now ends with a remainder row (work not attributed to any Jira key, minus meetings) and a separate meetings row, and a summary line shows that the three add up: `Работа за день 5ч 16м — задачи 2ч 48м, остальное 1ч 3м, созвоны 1ч 25м`
+- **Meetings are merged the same way everywhere** — the daily report and the week KPI still compared raw URLs and used a 2-minute gap, so they showed 68 minutes where the day card showed 85. Both now use the same code-based merge with a 20-minute tolerance as `shared/meetings.ts`
+
 ### Changed
 - **Hour scale shows all 24 hours with ticks** — the strip had nine labels placed with `justify-between`, and the working part of the day occupies a third of the width, so there was nothing to measure against. Every hour now has a tick, all 24 numbers are labelled at their real positions, and 0 / 6 / 12 / 18 are set in semibold
 
