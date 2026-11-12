@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Component, type ReactNode } from 'react'
 import { Clock, Activity, BarChart3, Settings as SettingsIcon, ChevronRight, MoreVertical, Briefcase, AlertTriangle } from 'lucide-react'
-import type { CurrentActivity, DetailedDaySummary, WindowEntry, AppTag, TagType, TagTargetType, TrackingHealthStatus } from '../../shared/types'
+import type { CurrentActivity, DayCoverage, DetailedDaySummary, WindowEntry, AppTag, TagType, TagTargetType, TrackingHealthStatus } from '../../shared/types'
 import { formatDuration, formatLocalDate } from './lib/format'
 import StatsView from './pages/StatsView'
 import SettingsView from './pages/SettingsView'
@@ -259,11 +259,13 @@ function DaySummaryView({
   const totalActive = summary.reduce((sum, s) => sum + s.totalTime, 0)
   const { tags, setTag, deleteTag } = useAppTags()
   const [afkTime, setAfkTime] = useState(0)
+  const [coverage, setCoverage] = useState<DayCoverage | null>(null)
 
   useEffect(() => {
     window.api.activities.getAfkTime(selectedDate).then((secs: number) => {
       setAfkTime(secs)
     })
+    window.api.activities.getDayCoverage(selectedDate).then(setCoverage)
   }, [selectedDate])
 
   // Date navigation
@@ -299,10 +301,26 @@ function DaySummaryView({
         </button>
       </div>
 
-      {/* Total active time */}
+      {/* Total active time + куда ушёл день */}
       <div className="rounded-lg border border-tt-border bg-tt-surface p-4">
         <div className="text-sm text-tt-muted">Всего активно</div>
         <div className="mt-1 text-3xl font-semibold text-tt-text">{formatDuration(totalActive)}</div>
+        {coverage && coverage.span > 0 && (
+          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 border-t border-tt-border pt-3 text-xs text-tt-muted">
+            <span>
+              Вне AFK: <span className="text-tt-text">{formatDuration(coverage.active)}</span>
+            </span>
+            <span>
+              AFK: <span className="text-tt-text">{formatDuration(coverage.afk)}</span>
+            </span>
+            <span>
+              Не записано: <span className="text-tt-text">{formatDuration(coverage.uncovered)}</span>
+            </span>
+            <span>
+              Всего от первого события: <span className="text-tt-text">{formatDuration(coverage.span)}</span>
+            </span>
+          </div>
+        )}
       </div>
 
       {/* App list */}

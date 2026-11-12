@@ -78,8 +78,19 @@ function main() {
   run('/usr/bin/codesign', ['--verify', '--strict', DEST])
   console.log('[install] Подпись проверена ✓')
 
-  run('/usr/bin/open', [DEST])
-  console.log('[install] Запущено')
+  // LaunchServices иногда отвечает -609 сразу после замены бандла — повторяем
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      run('/usr/bin/open', [DEST])
+      console.log('[install] Запущено')
+      return
+    } catch {
+      if (attempt === 3) {
+        console.warn('[install] Не удалось запустить автоматически — запустите CarpeDiem из /Applications')
+        return
+      }
+    }
+  }
 }
 
 try {

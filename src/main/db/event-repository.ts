@@ -9,7 +9,7 @@
  * Не зависит от categories/rules/tags — только events table + LEFT JOIN categories.
  */
 import type Database from 'better-sqlite3'
-import type { ActivityEvent, DaySummary, DetailedDaySummary } from '../../shared/types'
+import type { ActivityEvent, DayCoverage, DaySummary, DetailedDaySummary } from '../../shared/types'
 import {
   rowToEvent,
   localDayBounds,
@@ -68,6 +68,46 @@ export class EventRepository {
     this.db
       .prepare('UPDATE events SET ts_end = ?, duration = ? WHERE id = ?')
       .run(tsEnd, duration, id)
+  }
+
+  /**
+   * Обновляет прогресс ещё не закрытого события.
+   *
+   * Зачем: длительность пишется только при закрытии, поэтому текущий кусок
+   * активности не попадал ни в одну сводку — «за сегодня» отставало на всё
+   * время, пока пользователь не переключит окно. Пишем прогресс по ходу дела,
+   * заодно краш больше не оставляет событие с duration = 0.
+   */
+  updateEventProgress(id: number, tsEnd: string, duration: number): void {
+    this.db
+      .prepare('UPDATE events SET ts_end = ?, duration = ? WHERE id = ?')
+      .run(tsEnd, duration, id)
+  }
+
+  /**
+   * Покрытие дня: активность, AFK и время, не записанное вообще.
+   *
+   * Без этой разбивки день выглядит короче, чем был: непонятно, куда ушло
+   * остальное — в отлучки или в простои самого приложения.
+   */
+  getDayCoverage(date: string): DayCoverage {
+    const { start, end } = localDayBounds(date)
+    const row = this.db
+      .prepare(`
+        SELECT
+          COALESCE(SUM(CASE WHEN is_afk = 0 THEN duration ELSE 0 END), 0) AS active,
+          COALESCE(SUM(CASE WHEN is_afk = 1 THEN duration ELSE 0 END), 0) AS afk,
+          COALESCE((julianday(max(ts_end)) - julianday(min(ts_start))) * 86400, 0) AS span
+        FROM events
+        WHERE ts_start >= ? AND ts_start <= ?
+      `)
+      .get(start, end) as { active: number; afk: number; span: number } | undefined
+
+    const active = Math.max(Math.round(row?.active ?? 0), 0)
+    const afk = Math.max(Math.round(row?.afk ?? 0), 0)
+    const span = Math.max(Math.round(row?.span ?? 0), 0)
+
+    return { active, afk, span, uncovered: Math.max(span - active - afk, 0) }
   }
 
   /**

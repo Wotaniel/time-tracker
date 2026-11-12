@@ -16,7 +16,7 @@ import { log } from './safe-log'
  * При возврате: вычисляем точное время отсутствия для записи в БД.
  */
 export class AFKDetector extends EventEmitter {
-  private idleThresholdSec: number = 60 // 1 минута по умолчанию
+  private idleThresholdSec: number = 600 // 10 минут по умолчанию
   private pollIntervalMs: number = 5000 // check каждые 5 сек
   private intervalId: NodeJS.Timeout | null = null
 

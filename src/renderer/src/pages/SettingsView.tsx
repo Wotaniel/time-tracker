@@ -3,7 +3,7 @@ import { Power, Clock, Download, ShieldOff, X, FileJson } from 'lucide-react'
 
 export default function SettingsView(): JSX.Element {
   const [autostart, setAutostart] = useState(false)
-  const [idleThreshold, setIdleThreshold] = useState(60)
+  const [idleThreshold, setIdleThreshold] = useState(600)
   const [excludedApps, setExcludedApps] = useState<string[]>([])
   const [newApp, setNewApp] = useState('')
   const [loading, setLoading] = useState(true)
@@ -110,7 +110,7 @@ export default function SettingsView(): JSX.Element {
                 <input
                   type="range"
                   min="60"
-                  max="600"
+                  max="1800"
                   step="30"
                   value={idleThreshold}
                   onChange={(e) => setIdleThreshold(parseInt(e.target.value))}

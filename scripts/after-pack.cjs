@@ -25,7 +25,9 @@
  * build used to look green while permissions were broken.
  */
 const { execSync } = require('child_process')
-const { join } = require('path')
+const { existsSync, mkdirSync, rmSync } = require('fs')
+const { tmpdir } = require('os')
+const { basename, join } = require('path')
 
 const SIGNING_IDENTITY = 'AliSwitcher Code Signing'
 
@@ -38,6 +40,9 @@ function stripAttributes(appPath) {
   execSync(`xattr -cr "${appPath}"`, { stdio: 'inherit' })
   execSync(`find "${appPath}" -exec xattr -c {} + 2>/dev/null || true`, { stdio: 'inherit' })
 }
+
+/** Сколько раз пробуем подписать: iCloud возвращает xattr за миллисекунды */
+const SIGN_ATTEMPTS = 5
 
 /**
  * Падает, если печать подписи битая. Без строгой проверки сборка «зелёная»,
@@ -59,6 +64,68 @@ function assertSealValid(appPath) {
   }
 }
 
+/**
+ * Подписывает и проверяет печать, повторяя попытку.
+ *
+ * Почему цикл: синхронизация iCloud успевает вернуть xattr на бандл между
+ * `xattr -cr` и `codesign`, и подпись падает с "resource fork, Finder
+ * information, or similar detritus not allowed". Гонку нельзя выиграть
+ * гарантированно, но можно повторить.
+ */
+function signAndVerify(appPath, identity) {
+  let lastError = null
+
+  for (let attempt = 1; attempt <= SIGN_ATTEMPTS; attempt++) {
+    try {
+      stripAttributes(appPath)
+      execSync(`codesign --force --deep --sign "${identity}" "${appPath}"`, { stdio: 'pipe' })
+
+      // xattr могут вернуться и после подписи — чистим и проверяем начисто
+      stripAttributes(appPath)
+      assertSealValid(appPath)
+      return
+    } catch (err) {
+      lastError = err
+      console.warn(`[afterPack] Попытка ${attempt}/${SIGN_ATTEMPTS} не удалась, повторяю…`)
+    }
+  }
+
+  throw lastError
+}
+
+/**
+ * Подписывает приложение ВНЕ синхронизируемой папки.
+ *
+ * Почему: репозиторий лежит в ~/Documents, а iCloud Drive возвращает
+ * com.apple.FinderInfo и com.apple.fileprovider.fpfs#P на вложенные
+ * .app/.framework быстрее, чем успевает пройти codesign. Пять попыток подряд
+ * падают с "resource fork, Finder information, or similar detritus not allowed".
+ * Поэтому копируем бандл в системный tmp, подписываем и проверяем там, а обратно
+ * возвращаем через ditto --noextattr.
+ */
+function signOutsideCloudSync(appPath, identity) {
+  const staging = join(tmpdir(), 'carpediem-sign')
+  rmSync(staging, { recursive: true, force: true })
+  mkdirSync(staging, { recursive: true })
+
+  const staged = join(staging, basename(appPath))
+  execSync(`ditto --noextattr "${appPath}" "${staged}"`, { stdio: 'inherit' })
+
+  try {
+    signAndVerify(staged, identity)
+  } finally {
+    // Возвращаем подписанный бандл на место, не перенося xattr
+    try {
+      rmSync(appPath, { recursive: true, force: true })
+      if (existsSync(staged)) {
+        execSync(`ditto --noextattr "${staged}" "${appPath}"`, { stdio: 'inherit' })
+      }
+    } finally {
+      rmSync(staging, { recursive: true, force: true })
+    }
+  }
+}
+
 exports.default = async function (context) {
   if (context.electronPlatformName !== 'darwin') return
 
@@ -76,27 +143,14 @@ exports.default = async function (context) {
 
   // 1. Remove resource forks / extended attributes from ALL files in the bundle
   // 2. Sign with self-signed certificate: --force (overwrite), --deep (nested)
-  stripAttributes(appPath)
-
   try {
-    execSync(`codesign --force --deep --sign "${SIGNING_IDENTITY}" "${appPath}"`, {
-      stdio: 'inherit'
-    })
+    signOutsideCloudSync(appPath, SIGNING_IDENTITY)
     console.log('[afterPack] Certificate signing complete ✓')
   } catch (err) {
     console.error('[afterPack] Certificate signing failed:', err.message)
     // Fallback: ad-hoc signing (no stable TCC, but app still runs)
     console.warn('[afterPack] Falling back to ad-hoc signing')
-    stripAttributes(appPath)
-    execSync(`codesign --force --deep --sign - "${appPath}"`, {
-      stdio: 'inherit'
-    })
+    signOutsideCloudSync(appPath, '-')
     console.log('[afterPack] Ad-hoc fallback signing complete ✓')
   }
-
-  // xattr могут появиться даже между подписью и этим шагом — чистим ещё раз,
-  // затем проверяем печать и валим сборку, если она не сходится
-  stripAttributes(appPath)
-  assertSealValid(appPath)
-  console.log('[afterPack] Seal verified: codesign --verify --strict ✓')
 }

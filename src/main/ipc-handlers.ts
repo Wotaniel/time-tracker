@@ -64,6 +64,11 @@ export function registerIpcHandlers(
     return db.getAfkTimeForDay(date)
   })
 
+  ipcMain.handle(IPC_CHANNELS.ACTIVITIES_GET_DAY_COVERAGE, (_event, date: string) => {
+    validateDate(date)
+    return db.getDayCoverage(date)
+  })
+
   // ─── Categories ───────────────────────────────────────────
 
   ipcMain.handle(IPC_CHANNELS.CATEGORIES_GET_ALL, () => {
