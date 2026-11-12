@@ -16,6 +16,7 @@ let tracker: TrackingEngine | null = null
 let afkDetector: AFKDetector | null = null
 let trackingHealth: TrackingHealth | null = null
 let isQuitting = false
+let trayRefreshTimer: NodeJS.Timeout | null = null
 
 // Set app name before ready — affects macOS menu bar, active-win results, tray
 app.setName('CarpeDiem')
@@ -298,7 +299,7 @@ app.whenReady().then(() => {
   createWindow()
 
   // Refresh tray menu every 30s (duration grows even without activity change)
-  setInterval(() => updateTrayMenu(), 30_000)
+  trayRefreshTimer = setInterval(() => updateTrayMenu(), 30_000)
 
   app.on('activate', () => {
     // macOS: clicking dock icon — показываем существующее окно или создаём
@@ -319,6 +320,10 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   isQuitting = true
+  if (trayRefreshTimer) {
+    clearInterval(trayRefreshTimer)
+    trayRefreshTimer = null
+  }
   // Закрываем текущее событие перед выходом
   tracker?.stop()
   afkDetector?.stop()

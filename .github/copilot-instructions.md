@@ -15,7 +15,7 @@ Privacy-first: all data local, no network requests.
 - Preload bridges via `contextBridge` → `window.api`
 - Renderer calls main through `ipcRenderer.invoke()` only
 - IPC channels: `domain:action` (e.g., `activities:getDay`)
-- Full IPC contract: see `SDD.md`
+- Full IPC contract: see `docs/ARCHITECTURE.md`
 
 ## Code conventions
 - `kebab-case.ts` for modules, `PascalCase.tsx` for components

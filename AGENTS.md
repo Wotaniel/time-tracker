@@ -6,7 +6,7 @@
 
 **Time Tracker** — автоматический трекер активности для macOS.
 Стек: Electron + React + TypeScript + SQLite + Vite + TailwindCSS.
-Данные — локальные (privacy-first). Подробности: `SDD.md`, `PRD.md`.
+Данные — локальные (privacy-first). Подробности: `docs/ARCHITECTURE.md`, `PRD.md`.
 
 ## Архитектура (коротко)
 
@@ -106,9 +106,9 @@ npm run install:mac
 ## Что делать / чего не делать
 
 ### ✅ Делай
-- Перед изменением IPC канала — проверь SDD.md (может быть контракт)
+- Перед изменением IPC канала — проверь `docs/ARCHITECTURE.md` (там контракт)
 - Добавляй TypeScript интерфейсы для всех IPC payloads
-- При новой таблице БД — добавь миграцию + обнови SDD.md
+- При новой таблице БД — добавь миграцию + обнови `docs/ARCHITECTURE.md`
 - Тестируй что TrackingEngine не пишет события когда paused
 - Проверяй что private окна не трекаются
 - Отмечай изменения в CHANGELOG.md

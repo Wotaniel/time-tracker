@@ -124,4 +124,11 @@ export function installGlobalErrorHandlers(): void {
       // nothing
     }
   })
+
+  // Отклонённый промис раньше уходил в никуда: в packaged-режиме stderr некуда
+  // писать, и сбой тихо терялся. Логируем так же, как исключения.
+  process.on('unhandledRejection', (reason: unknown) => {
+    const message = reason instanceof Error ? reason.stack || reason.message : String(reason)
+    log.error('[Main] Unhandled rejection:', message)
+  })
 }

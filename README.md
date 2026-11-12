@@ -29,7 +29,8 @@ npm run dev
 ## Документация
 
 - [PRD.md](PRD.md) — продуктовые требования
-- [SDD.md](SDD.md) — архитектура и дизайн
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — как всё устроено по коду
+- [docs/UI-PLAN.md](docs/UI-PLAN.md) и [docs/NEXT-PLAN.md](docs/NEXT-PLAN.md) — планы работ
 - [AGENTS.md](AGENTS.md) — инструкции для AI-агентов
 - [CHANGELOG.md](CHANGELOG.md) — история изменений
 
