@@ -95,13 +95,17 @@ export class EventRepository {
     const row = this.db
       .prepare(`
         SELECT
-          COALESCE(SUM(CASE WHEN is_afk = 0 THEN duration ELSE 0 END), 0) AS active,
-          COALESCE(SUM(CASE WHEN is_afk = 1 THEN duration ELSE 0 END), 0) AS afk,
-          COALESCE((julianday(max(ts_end)) - julianday(min(ts_start))) * 86400, 0) AS span
+          COALESCE(SUM(CASE WHEN is_afk = 0
+            THEN (julianday(MIN(ts_end, @dayEnd)) - julianday(MAX(ts_start, @dayStart))) * 86400
+            ELSE 0 END), 0) AS active,
+          COALESCE(SUM(CASE WHEN is_afk = 1
+            THEN (julianday(MIN(ts_end, @dayEnd)) - julianday(MAX(ts_start, @dayStart))) * 86400
+            ELSE 0 END), 0) AS afk,
+          COALESCE((julianday(MIN(max(ts_end), @dayEnd)) - julianday(MAX(min(ts_start), @dayStart))) * 86400, 0) AS span
         FROM events
-        WHERE ts_start >= ? AND ts_start <= ?
+        WHERE ts_start <= @dayEnd AND ts_end >= @dayStart
       `)
-      .get(start, end) as { active: number; afk: number; span: number } | undefined
+      .get({ dayStart: start, dayEnd: end }) as { active: number; afk: number; span: number } | undefined
 
     const active = Math.max(Math.round(row?.active ?? 0), 0)
     const afk = Math.max(Math.round(row?.afk ?? 0), 0)
@@ -171,10 +175,21 @@ export class EventRepository {
    */
   getEventsByDay(date: string): ActivityEvent[] {
     const { start, end } = localDayBounds(date)
+    // Пересечение с днём, а не только старт внутри дня: иначе событие,
+    // начавшееся до полуночи, целиком исчезает из сегодняшнего дня.
     const rows = this.db
-      .prepare('SELECT * FROM events WHERE ts_start >= ? AND ts_start <= ? ORDER BY ts_start ASC')
-      .all(start, end) as RawEventRow[]
-    return rows.map(rowToEvent)
+      .prepare('SELECT * FROM events WHERE ts_start <= ? AND ts_end >= ? ORDER BY ts_start ASC')
+      .all(end, start) as RawEventRow[]
+
+    return rows.map((row) => {
+      const clampedStart = row.ts_start < start ? start : row.ts_start
+      const clampedEnd = row.ts_end > end ? end : row.ts_end
+      const duration = Math.max(
+        0,
+        Math.round((new Date(clampedEnd).getTime() - new Date(clampedStart).getTime()) / 1000)
+      )
+      return rowToEvent({ ...row, ts_start: clampedStart, ts_end: clampedEnd, duration })
+    })
   }
 
   /**
@@ -198,21 +213,21 @@ export class EventRepository {
       .prepare(`
         SELECT
           e.app_name        AS appName,
-          SUM(e.duration)   AS totalTime,
+          SUM((julianday(MIN(e.ts_end, @dayEnd)) - julianday(MAX(e.ts_start, @dayStart))) * 86400) AS totalTime,
           e.category_id     AS categoryId,
           c.name            AS categoryName
         FROM events e
         LEFT JOIN categories c ON e.category_id = c.id
-        WHERE e.ts_start >= ? AND e.ts_start <= ? AND e.is_afk = 0
+        WHERE e.ts_start <= @dayEnd AND e.ts_end >= @dayStart AND e.is_afk = 0
         GROUP BY e.app_name
         ORDER BY totalTime DESC
       `)
-      .all(start, end) as RawSummaryRow[]
+      .all({ dayStart: start, dayEnd: end }) as RawSummaryRow[]
 
     const total = rows.reduce((sum, r) => sum + r.totalTime, 0)
     return rows.map((r) => ({
       appName: r.appName,
-      totalTime: r.totalTime,
+      totalTime: Math.round(r.totalTime),
       percentage: total > 0 ? (r.totalTime / total) * 100 : 0,
       categoryId: r.categoryId ?? undefined,
       categoryName: r.categoryName ?? undefined
@@ -231,16 +246,16 @@ export class EventRepository {
           e.app_bundle      AS appBundleId,
           e.window_title    AS windowTitle,
           e.url             AS url,
-          SUM(e.duration)   AS totalTime,
+          SUM((julianday(MIN(e.ts_end, @dayEnd)) - julianday(MAX(e.ts_start, @dayStart))) * 86400) AS totalTime,
           e.category_id     AS categoryId,
           c.name            AS categoryName
         FROM events e
         LEFT JOIN categories c ON e.category_id = c.id
-        WHERE e.ts_start >= ? AND e.ts_start <= ? AND e.is_afk = 0
+        WHERE e.ts_start <= @dayEnd AND e.ts_end >= @dayStart AND e.is_afk = 0
         GROUP BY e.app_name, e.window_title, e.url
         ORDER BY e.app_name, totalTime DESC
       `)
-      .all(start, end) as RawDetailedRow[]
+      .all({ dayStart: start, dayEnd: end }) as RawDetailedRow[]
 
     const appMap = new Map<string, DetailedDaySummary>()
     for (const row of rows) {
@@ -257,7 +272,7 @@ export class EventRepository {
         }
         appMap.set(row.appName, app)
       }
-      app.totalTime += row.totalTime
+      app.totalTime += Math.round(row.totalTime)
       app.windows.push({
         windowTitle: row.windowTitle,
         url: row.url,
@@ -279,11 +294,14 @@ export class EventRepository {
     const { start, end } = localDayBounds(date)
     const row = this.db
       .prepare(`
-        SELECT COALESCE(SUM(duration), 0) AS totalAfk
+        SELECT COALESCE(
+          SUM((julianday(MIN(ts_end, @dayEnd)) - julianday(MAX(ts_start, @dayStart))) * 86400),
+          0
+        ) AS totalAfk
         FROM events
-        WHERE ts_start >= ? AND ts_start <= ? AND is_afk = 1
+        WHERE ts_start <= @dayEnd AND ts_end >= @dayStart AND is_afk = 1
       `)
-      .get(start, end) as { totalAfk: number }
-    return row.totalAfk ?? 0
+      .get({ dayStart: start, dayEnd: end }) as { totalAfk: number }
+    return Math.round(row.totalAfk ?? 0)
   }
 }

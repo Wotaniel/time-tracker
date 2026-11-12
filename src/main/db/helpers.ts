@@ -147,6 +147,44 @@ export function localDayBounds(date: string): { start: string; end: string } {
 }
 
 /**
+ * Режет интервал по локальным суткам.
+ *
+ * Зачем: событие 23:50–00:30 принадлежит двум дням. Раньше дневные запросы
+ * фильтровали только по ts_start, и весь «хвост» уходил во вчера — сегодня
+ * терялоcь полчаса работы.
+ */
+export interface DaySlice {
+  date: string
+  seconds: number
+}
+
+export function splitAcrossLocalDays(tsStart: string, tsEnd: string): DaySlice[] {
+  const start = new Date(tsStart)
+  const end = new Date(tsEnd)
+  if (!(end.getTime() > start.getTime())) {
+    return [{ date: formatLocalDate(start), seconds: 0 }]
+  }
+
+  const slices: DaySlice[] = []
+  let cursor = start
+
+  while (cursor < end) {
+    // Локальная полночь следующего дня (учитывает переход на летнее время)
+    const dayEnd = new Date(cursor)
+    dayEnd.setHours(24, 0, 0, 0)
+    const sliceEnd = end < dayEnd ? end : dayEnd
+
+    slices.push({
+      date: formatLocalDate(cursor),
+      seconds: Math.round((sliceEnd.getTime() - cursor.getTime()) / 1000)
+    })
+    cursor = sliceEnd
+  }
+
+  return slices
+}
+
+/**
  * Форматирует Date в локальную дату "YYYY-MM-DD" (без UTC-сдвига).
  */
 export function formatLocalDate(d: Date): string {

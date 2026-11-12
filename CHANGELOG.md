@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **An event crossing midnight vanished from the next day** — day queries filtered by `ts_start` only, so work from 23:50 to 00:30 was counted entirely for yesterday and today lost the tail. Day queries now select by overlap and clamp to the day bounds, and `getDailyStats` splits an event across local days (`splitAcrossLocalDays`)
+- **`getTopApps` inflated percentages** — the denominator was the sum of the returned top-N rows, so top-10 always added up to 100%. It now uses the total time of the period
+- **`validateDate` accepted `2026-13-99`** — the regex passed and `localDayBounds` then threw `RangeError` deep inside IPC. The check moved to `src/main/validation.ts` and now verifies the calendar day itself
+
 ### Added
 - **Tests and CI** — the project had zero tests while most of the core was rewritten. Vitest now runs 23 tests in 0.6 s against in-memory SQLite: Jira key and domain parsing, local day bounds, the migration runner (all tables created, second run is a no-op, Google Meet events moved to meetings), `getDailyStats` range and per-day grouping, `getDayCoverage`, `getUntagged`, and meeting range queries. Because `better-sqlite3` is built for Electron's ABI, tests run under `ELECTRON_RUN_AS_NODE=1 electron` — that is why the CI job uses a macOS runner. `npm run typecheck`, `npm run lint` and `npm test` run on every push to `main` and every PR
 

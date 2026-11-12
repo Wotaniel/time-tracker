@@ -24,6 +24,7 @@ import {
   localDayBounds,
   formatLocalDate,
   extractDomainFromUrl,
+  splitAcrossLocalDays,
   type RawSummaryRow
 } from './helpers'
 import { TagRepository } from './tag-repository'
@@ -54,25 +55,15 @@ export class StatsRepository {
     const { start } = localDayBounds(fromStr)
     const { end } = localDayBounds(toStr)
 
-    // 1. Per-day totals (one query for all days)
-    const totalRows = this.db
-      .prepare(`
-        SELECT date(ts_start, 'localtime') AS day, COALESCE(SUM(duration), 0) AS totalActive
-        FROM events
-        WHERE ts_start >= ? AND ts_start <= ? AND is_afk = 0
-        GROUP BY date(ts_start)
-      `)
-      .all(start, end) as { day: string; totalActive: number }[]
-    const totalByDay = new Map(totalRows.map((r) => [r.day, r.totalActive]))
-
-    // 2. Per-day × per-tag breakdown (one query for all events, group in JS)
+    // Один запрос: события, пересекающиеся с диапазоном. Событие, начавшееся
+    // до полуночи, принадлежит двум дням, поэтому делим его по суткам в JS.
     const eventRows = this.db
       .prepare(`
-        SELECT app_name, url, duration, ts_start
+        SELECT app_name, url, ts_start, ts_end
         FROM events
-        WHERE ts_start >= ? AND ts_start <= ? AND is_afk = 0
+        WHERE ts_start <= ? AND ts_end >= ? AND is_afk = 0
       `)
-      .all(start, end) as { app_name: string; url: string | null; duration: number; ts_start: string }[]
+      .all(end, start) as { app_name: string; url: string | null; ts_start: string; ts_end: string }[]
 
     // Pre-load all tags for fast lookup
     const tags = this.tagRepo.getAllAppTags()
@@ -83,19 +74,10 @@ export class StatsRepository {
       else domainTagMap.set(t.targetKey, t.tag)
     }
 
-    // Group events by day + tag
+    const totalByDay = new Map<string, number>()
     const tagByDay = new Map<string, Record<string, number>>()
-    for (const e of eventRows) {
-      // Локальная дата: ts_start хранится в UTC, а ключи дней строятся локально.
-      // Из-за прямого substring(0, 10) всё, что случилось до 03:00 по Москве,
-      // попадало в предыдущий день.
-      const day = formatLocalDate(new Date(e.ts_start))
-      let dayMap = tagByDay.get(day)
-      if (!dayMap) {
-        dayMap = { work: 0, neutral: 0, distracting: 0, untagged: 0 }
-        tagByDay.set(day, dayMap)
-      }
 
+    for (const e of eventRows) {
       let tag: TagType | 'untagged' = 'untagged'
       const appTag = appTagMap.get(e.app_name)
       if (appTag) {
@@ -107,7 +89,17 @@ export class StatsRepository {
           if (domainTag) tag = domainTag
         }
       }
-      dayMap[tag] = (dayMap[tag] ?? 0) + e.duration
+
+      for (const slice of splitAcrossLocalDays(e.ts_start, e.ts_end)) {
+        totalByDay.set(slice.date, (totalByDay.get(slice.date) ?? 0) + slice.seconds)
+
+        let dayMap = tagByDay.get(slice.date)
+        if (!dayMap) {
+          dayMap = { work: 0, neutral: 0, distracting: 0, untagged: 0 }
+          tagByDay.set(slice.date, dayMap)
+        }
+        dayMap[tag] = (dayMap[tag] ?? 0) + slice.seconds
+      }
     }
 
     // Build result for each day in range
@@ -198,7 +190,16 @@ export class StatsRepository {
       `)
       .all(start, end, limit) as RawSummaryRow[]
 
-    const total = rows.reduce((sum, r) => sum + r.totalTime, 0)
+    // Знаменатель — всё время периода, а не сумма top-N: иначе проценты
+    // завышены (топ-10 всегда даёт 100%).
+    const totalRow = this.db
+      .prepare(`
+        SELECT COALESCE(SUM(duration), 0) AS total
+        FROM events
+        WHERE ts_start >= ? AND ts_start <= ? AND is_afk = 0
+      `)
+      .get(start, end) as { total: number }
+    const total = totalRow.total
     return rows.map(r => ({
       appName: r.appName,
       totalTime: r.totalTime,
