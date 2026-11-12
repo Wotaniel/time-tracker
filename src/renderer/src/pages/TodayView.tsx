@@ -14,6 +14,7 @@ import type {
 import { formatDuration, formatLocalDate } from '../lib/format'
 import { AppIcon } from '../lib/app-icons'
 import { TagBadge, TagMenu, tagColor, useAppTags } from '../lib/tags'
+import { METRIC } from '../lib/colors'
 import { extractDomain, groupByDomain, isBrowser } from '../lib/domains'
 import { mergeMeetings, meetingSeconds } from '../lib/meetings'
 import { DayLane } from '../components/DayLane'
@@ -167,22 +168,29 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
           {/* Слой 3: куда ушло остальное */}
           <div className="flex flex-wrap gap-x-6 gap-y-1 pb-1 text-xs text-tt-muted">
             <span>
-              работа <span className="text-tt-text">{formatDuration(workTime)}</span>
+              работа{' '}
+              <span style={{ color: METRIC.work }}>{formatDuration(workTime)}</span>
             </span>
             <span>
               созвоны{' '}
-              <span className="text-tt-purple" title="Входят в активность, не прибавляются к ней">
+              <span
+                style={{ color: METRIC.meeting }}
+                title="Входят в активность, не прибавляются к ней"
+              >
                 {formatDuration(meetingTime)}
               </span>
             </span>
             {coverage && (
               <>
                 <span>
-                  AFK <span className="text-tt-text">{formatDuration(coverage.afk)}</span>
+                  AFK{' '}
+                  <span style={{ color: METRIC.afk }}>{formatDuration(coverage.afk)}</span>
                 </span>
                 <span>
                   не записано{' '}
-                  <span className="text-tt-red">{formatDuration(coverage.uncovered)}</span>
+                  <span style={{ color: METRIC.uncovered }}>
+                    {formatDuration(coverage.uncovered)}
+                  </span>
                 </span>
               </>
             )}

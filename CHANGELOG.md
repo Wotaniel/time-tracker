@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **One colour palette for the whole app** — the day card painted «работа» and «AFK» in plain text while the strip legend painted them green and grey, and «отвлечение» and «не записано» shared the same red although one is a choice and the other is a hole in the data. Colours now live in `lib/colors.ts` and are used by the day card, the strip legend, tag badges and the week KPIs; «не записано» moved to amber so it no longer reads as «отвлечение»
+
 ### Added
 - **Calls are tracked in the background, not only when focused** — a huddle disappeared from tracking the moment you switched to Figma. The engine now reads the list of open windows every 5 seconds: the call window appearing starts the interval, its disappearance (pressing «end call») finishes it, and the end is stamped at the last moment it was seen. For Google Meet, whose tab is not visible in the window list, the old 10-minute safety net remains
 - **The `active-win` helper now has a timeout and is killed on hang** — the package called `execFile` without a timeout, so a stuck helper stayed alive while `setInterval` kept spawning new ones. `src/main/active-window.ts` runs the helper itself with a 3-second timeout

@@ -10,6 +10,7 @@ import {
 import type { DailyStat, DaySummary, HeatmapCell, Meeting, TagStat } from '../../../shared/types'
 import { formatDuration, formatLocalDate, formatShort } from '../lib/format'
 import { TAG_CONFIG } from '../lib/tags'
+import { METRIC } from '../lib/colors'
 
 /**
  * «Неделя» — экран анализа, а не второй «Сегодня».
@@ -114,24 +115,28 @@ export default function WeekView(): JSX.Element {
           value={formatDuration(activeCurrent)}
           delta={deltaLabel(activeCurrent, activePrev)}
           tone="good"
+          color={METRIC.activity}
         />
         <KpiCard
           label="Работа"
           value={formatDuration(workCurrent)}
           delta={deltaLabel(workCurrent, workPrev)}
           tone="good"
+          color={METRIC.work}
         />
         <KpiCard
           label="Отвлечения"
           value={formatDuration(distractingCurrent)}
           delta={deltaLabel(distractingCurrent, distractingPrev)}
           tone="bad"
+          color={METRIC.distracting}
         />
         <KpiCard
           label="Созвоны"
           value={formatDuration(meetingCurrent)}
           delta={deltaLabel(meetingCurrent, meetingPrev)}
           tone="neutral"
+          color={METRIC.meeting}
         />
       </div>
 
@@ -266,22 +271,26 @@ function KpiCard({
   label,
   value,
   delta,
-  tone
+  tone,
+  color
 }: {
   label: string
   value: string
   delta: string | null
   tone: Tone
+  color: string
 }): JSX.Element {
   const isUp = delta?.startsWith('+') ?? false
   const good = tone === 'neutral' ? null : tone === 'good' ? isUp : !isUp
-  const color = good === null ? 'text-tt-muted' : good ? 'text-tt-green' : 'text-tt-red'
+  const deltaClass = good === null ? 'text-tt-muted' : good ? 'text-tt-green' : 'text-tt-red'
 
   return (
     <div className="rounded-lg border border-tt-border bg-tt-surface p-4">
       <div className="text-xs text-tt-muted">{label}</div>
-      <div className="mt-1 text-2xl font-semibold leading-none">{value}</div>
-      <div className={`mt-2 text-[11px] ${color}`} title="К прошлой неделе">
+      <div className="mt-1 text-2xl font-semibold leading-none" style={{ color }}>
+        {value}
+      </div>
+      <div className={`mt-2 text-[11px] ${deltaClass}`} title="К прошлой неделе">
         {delta ?? '—'}
       </div>
     </div>

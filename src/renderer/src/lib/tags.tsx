@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AppTag, TagTargetType, TagType } from '../../../shared/types'
+import { METRIC } from './colors'
 
 /** Конфиг тегов: цвет, подпись, фон для badge */
 export const TAG_CONFIG: Record<TagType, { label: string; color: string; bg: string }> = {
-  work: { label: 'Работа', color: '#9ece6a', bg: '#9ece6a22' },
-  neutral: { label: 'Нейтр.', color: '#7aa2f7', bg: '#7aa2f722' },
-  distracting: { label: 'Отвлечение', color: '#f7768e', bg: '#f7768e22' }
+  work: { label: 'Работа', color: METRIC.work, bg: `${METRIC.work}22` },
+  neutral: { label: 'Нейтр.', color: METRIC.neutral, bg: `${METRIC.neutral}22` },
+  distracting: { label: 'Отвлечение', color: METRIC.distracting, bg: `${METRIC.distracting}22` }
 }
 
 /**

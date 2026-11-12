@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ActivityEvent, Meeting, TagType } from '../../../shared/types'
 import { formatDuration, formatLocalDate, formatTimeSec } from '../lib/format'
 import { tagColor } from '../lib/tags'
+import { METRIC } from '../lib/colors'
 
 /**
  * Лента дня: три дорожки вместо одной полоски.
@@ -171,8 +172,12 @@ export function DayLane({ events, meetings, date, tagFor }: DayLaneProps): JSX.E
           {meetingBars.map((bar) => (
             <div
               key={bar.key}
-              className="absolute inset-y-0 cursor-help rounded-sm bg-tt-purple"
-              style={{ left: `${bar.left}%`, width: `${bar.width}%` }}
+              className="absolute inset-y-0 cursor-help rounded-sm"
+              style={{
+                left: `${bar.left}%`,
+                width: `${bar.width}%`,
+                backgroundColor: METRIC.meeting
+              }}
               {...hoverProps(bar.hoverInfo)}
             />
           ))}
@@ -183,16 +188,24 @@ export function DayLane({ events, meetings, date, tagFor }: DayLaneProps): JSX.E
           {gaps.map((gap) => (
             <div
               key={gap.key}
-              className="absolute inset-y-0 cursor-help bg-tt-red/40"
-              style={{ left: `${gap.left}%`, width: `${gap.width}%` }}
+              className="absolute inset-y-0 cursor-help opacity-40"
+              style={{
+                left: `${gap.left}%`,
+                width: `${gap.width}%`,
+                backgroundColor: METRIC.uncovered
+              }}
               {...hoverProps(gap.hoverInfo)}
             />
           ))}
           {afkBars.map((bar) => (
             <div
               key={bar.key}
-              className="absolute inset-y-0 cursor-help bg-tt-muted/40"
-              style={{ left: `${bar.left}%`, width: `${bar.width}%` }}
+              className="absolute inset-y-0 cursor-help opacity-40"
+              style={{
+                left: `${bar.left}%`,
+                width: `${bar.width}%`,
+                backgroundColor: METRIC.afk
+              }}
               {...hoverProps(bar.hoverInfo)}
             />
           ))}
@@ -227,24 +240,20 @@ export function DayLane({ events, meetings, date, tagFor }: DayLaneProps): JSX.E
 
       {/* Легенда */}
       <div className="mt-2 flex flex-wrap items-center gap-4 text-[10px] text-tt-muted">
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-sm bg-tt-green" /> работа
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-sm bg-tt-accent" /> нейтрально
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-sm bg-tt-red" /> отвлечение
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-sm bg-tt-purple" /> созвоны
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-sm bg-tt-muted/40" /> AFK
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-sm bg-tt-red/40" /> не записано
-        </span>
+        {(
+          [
+            ['работа', METRIC.work],
+            ['нейтрально', METRIC.neutral],
+            ['отвлечение', METRIC.distracting],
+            ['созвоны', METRIC.meeting],
+            ['AFK', METRIC.afk],
+            ['не записано', METRIC.uncovered]
+          ] as const
+        ).map(([label, color]) => (
+          <span key={label} className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: color }} /> {label}
+          </span>
+        ))}
       </div>
     </div>
   )
