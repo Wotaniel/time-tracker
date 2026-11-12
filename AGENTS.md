@@ -80,23 +80,28 @@ Dev-режим (`npm run dev`) не покрывает production-специфи
 пути к ресурсам (`process.resourcesPath`), asar, code signing, native modules.
 Многие баги (migrations not found, tray icon path, extraResources) видны только в `.app`.
 
-Паттерн:
-```bash
-npm run package:mac                          # сборка DMG
-pkill -f "CarpeDiem" 2>/dev/null             # убить старый процесс
-rm -rf /Applications/CarpeDiem.app           # удалить старую версию
-cp -R release/mac-arm64/CarpeDiem.app /Applications/
-xattr -cr /Applications/CarpeDiem.app        # снять quarantine (unsigned app)
-# Запуск и проверка:
-/Applications/CarpeDiem.app/Contents/MacOS/CarpeDiem 2>&1
-# Проверить: окно открылось, трекинг работает, tray есть, БД инициализирована
-```
-
-Если DMG уже собран и только менялся код — можно пересобрать без чистого install:
+Паттерн (одна команда — собрать, поставить, проверить подпись и запустить):
 ```bash
 npm run package:mac
-# далее reinstall как выше
+# Проверить в логе:
+#   [afterPack] Seal verified: codesign --verify --strict ✓
+#   [install] Подпись проверена ✓
+# Затем: окно открылось, трекинг пишет, tray есть, БД инициализирована
 ```
+
+Если менялся только код и нужно переставить уже собранное:
+```bash
+npm run install:mac
+```
+
+**Почему нельзя запускать `.app` из `release/`.** Репозиторий лежит в `~/Documents`,
+а iCloud Drive синхронизирует эту папку целиком. Через секунды после сборки на бандл
+возвращаются посторонние xattr (`com.apple.FinderInfo`, `com.apple.fileprovider.fpfs#P`),
+`codesign --verify --strict` перестаёт проходить, и macOS больше не сопоставляет
+приложение с записью о разрешении «Универсальный доступ»: тумблер в Системных настройках
+есть, но разрешение не применяется, а трекер молча не пишет ни одного события.
+`scripts/after-pack.cjs` проверяет печать после подписи и валит сборку, если она битая,
+а `scripts/install-mac.cjs` ставит копию в `/Applications`, где синхронизации нет.
 
 ## Что делать / чего не делать
 

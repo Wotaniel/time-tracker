@@ -57,6 +57,19 @@ const api = {
     getAll: () => ipcRenderer.invoke(IPC_CHANNELS.TAGS_GET_ALL),
     set: (targetType: string, targetKey: string, tag: string) => ipcRenderer.invoke(IPC_CHANNELS.TAGS_SET, targetType, targetKey, tag),
     delete: (targetType: string, targetKey: string) => ipcRenderer.invoke(IPC_CHANNELS.TAGS_DELETE, targetType, targetKey)
+  },
+  health: {
+    getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.HEALTH_GET_STATUS),
+    openAccessibilitySettings: () => ipcRenderer.invoke(IPC_CHANNELS.HEALTH_OPEN_ACCESSIBILITY_SETTINGS),
+    onChanged: (callback: (status: unknown) => void) => {
+      const listener = (_event: unknown, status: unknown): void => {
+        callback(status)
+      }
+      ipcRenderer.on(IPC_CHANNELS.HEALTH_CHANGED, listener)
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.HEALTH_CHANGED, listener)
+      }
+    }
   }
 }
 

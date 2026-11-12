@@ -5,8 +5,22 @@ import type { DatabaseManager } from './database'
 import type { CurrentActivity } from '../shared/types'
 import { log } from './safe-log'
 
-/** Имена процесса трекера (dev='Electron', prod='CarpeDiem') — чтобы не трекать себя */
-const SELF_APP_NAMES = new Set(['Electron', app.getName()])
+/** Имена процесса трекера в dev-режиме — active-win может отдать 'Electron' */
+const SELF_APP_NAMES = new Set(['Electron'])
+
+/**
+ * Активность самого трекера — её нельзя писать в БД.
+ *
+ * Признак по имени приложения ненадёжен: `app.getName()` на момент импорта этого
+ * модуля ещё не переименован в CarpeDiem (`app.setName()` вызывается в index.ts
+ * уже после импортов), поэтому окно трекера попадало в статистику как реальная
+ * работа. PID главного процесса от порядка инициализации не зависит.
+ */
+function isSelfActivity(win: NonNullable<Awaited<ReturnType<typeof activeWin>>>): boolean {
+  if (win.owner.processId === process.pid) return true
+  const appName = win.owner.name
+  return SELF_APP_NAMES.has(appName) || appName === app.getName()
+}
 
 /** Приложения, которые появляются когда экран заблокирован / скринсейвер.
  * active-win на macOS возвращает loginwindow когда экран залочен,
@@ -325,7 +339,7 @@ export class TrackingEngine extends EventEmitter {
       this.updateMeetingTracking(url, Date.now())
 
       // Skip self-tracking — don't record events for the tracker's own window
-      if (SELF_APP_NAMES.has(appName)) {
+      if (isSelfActivity(win)) {
         if (!this.isSelfFocused) {
           // Close current real event to record accurate duration
           this.closeCurrentEvent()
