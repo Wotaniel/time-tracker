@@ -14,16 +14,30 @@ import { app } from 'electron'
 import { log } from '../safe-log'
 
 /**
+ * Где искать миграции. Список собирается лениво: модуль импортируется и в тестах,
+ * где `electron.app` недоступен (ELECTRON_RUN_AS_NODE), и падать там он не должен.
+ */
+function resolveMigrationDirs(explicitDir?: string): string[] {
+  if (explicitDir) return [explicitDir]
+
+  const candidates = [join(__dirname, '../../src/main/migrations')]
+
+  try {
+    const appPath = app?.getAppPath?.()
+    if (appPath) candidates.push(join(appPath, 'src/main/migrations'))
+  } catch {
+    // Не Electron (тесты) — путь не нужен
+  }
+
+  if (process.resourcesPath) candidates.push(join(process.resourcesPath, 'migrations'))
+  return candidates
+}
+
+/**
  * Запускает все неприменённые миграции из директории migrations/.
  */
-export function runMigrations(db: Database.Database): void {
-  // В dev режиме __dirname = out/main/, миграции в src/main/migrations/
-  // В prod (packaged) — миграции в resources/migrations/
-  const candidates = [
-    join(__dirname, '../../src/main/migrations'),  // dev: out/main/ → src/main/migrations/
-    join(app.getAppPath(), 'src/main/migrations'),  // alt dev path
-    join(process.resourcesPath ?? '', 'migrations') // prod: packaged resources
-  ]
+export function runMigrations(db: Database.Database, explicitDir?: string): void {
+  const candidates = resolveMigrationDirs(explicitDir)
 
   let migrationsDir: string | null = null
   let files: string[] = []

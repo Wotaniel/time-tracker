@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Tests and CI** — the project had zero tests while most of the core was rewritten. Vitest now runs 23 tests in 0.6 s against in-memory SQLite: Jira key and domain parsing, local day bounds, the migration runner (all tables created, second run is a no-op, Google Meet events moved to meetings), `getDailyStats` range and per-day grouping, `getDayCoverage`, `getUntagged`, and meeting range queries. Because `better-sqlite3` is built for Electron's ABI, tests run under `ELECTRON_RUN_AS_NODE=1 electron` — that is why the CI job uses a macOS runner. `npm run typecheck`, `npm run lint` and `npm test` run on every push to `main` and every PR
+
 ### Fixed
 - **Looking at the stats left a hole in the day** — the engine closed the current event and recorded nothing while CarpeDiem's own window was in front, so the day strip had gaps and the header read «Idle». Own window is now tracked like any other app under the name `CarpeDiem`; it is untagged, so it shows up in the «Без тега» queue instead of inflating work
 - **«Приложение не работало» was a wrong label** — a gap means only «no events», which happens when the app was closed, paused, or its own window was open. The tooltip now says «Нет событий» and lists the causes instead of asserting one
