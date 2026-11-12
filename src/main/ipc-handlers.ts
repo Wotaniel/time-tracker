@@ -8,6 +8,7 @@ import type { AFKDetector } from './afk-detector'
 import type { TrackingHealth } from './tracking-health'
 import { getAppIcon } from './app-icons'
 import { validateDate } from './validation'
+import { getCalendarDay } from './calendar'
 import { buildPeriodReport } from '../shared/report'
 import { WEEKLY_GOAL_HOURS } from '../shared/goal'
 import { mergeMeetings, meetingSeconds } from '../shared/meetings'
@@ -81,6 +82,16 @@ export function registerIpcHandlers(
   ipcMain.handle(IPC_CHANNELS.MEETINGS_GET_DAY, (_event, date: string) => {
     validateDate(date)
     return db.getMeetingsByDay(date)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.CALENDAR_GET_DAY, async (_event, date: string) => {
+    validateDate(date)
+    // По умолчанию выключено: AppleScript к Calendar может идти минутами,
+    // а приложение не должно из-за этого плодить процессы
+    if (db.getSetting('calendarEnabled') !== 'true') {
+      return { available: false, reason: 'error' as const, events: [] }
+    }
+    return getCalendarDay(date)
   })
 
   ipcMain.handle(IPC_CHANNELS.MEETINGS_GET_RANGE, (_event, from: string, to: string) => {
@@ -407,6 +418,7 @@ const ALLOWED_SETTING_KEYS = new Set([
   'primaryCity',
   'secondaryCity',
   'weeklyWorkGoal',
+  'calendarEnabled',
 ])
 
 function assertSettingKey(key: string): void {

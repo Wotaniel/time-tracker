@@ -6,6 +6,7 @@ import type {
   DayCoverage,
   DetailedDaySummary,
   Meeting,
+  PlannedEvent,
   TagTargetType,
   TagType,
   TaskStat,
@@ -47,6 +48,7 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
   const [goalSeconds, setGoalSeconds] = useState(0)
   const [primaryCity, setPrimaryCity] = useState<City | null>(null)
   const [secondaryCity, setSecondaryCity] = useState<City | null>(null)
+  const [planned, setPlanned] = useState<PlannedEvent[]>([])
   const { tags, setTag, deleteTag } = useAppTags()
 
   // Всё, что показывает день, обновляется вместе: раньше созвоны и покрытие
@@ -97,6 +99,25 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
     },
     [categories]
   )
+
+  // Календарь читается медленно (AppleScript), поэтому реже и отдельным эффектом
+  useEffect(() => {
+    let cancelled = false
+    const loadCalendar = (): void => {
+      window.api.calendar
+        .getDay(selectedDate)
+        .then((day) => {
+          if (!cancelled) setPlanned(day.available ? day.events : [])
+        })
+        .catch(() => setPlanned([]))
+    }
+    loadCalendar()
+    const interval = setInterval(loadCalendar, 5 * 60_000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [selectedDate])
 
   useEffect(() => {
     if (!showTasks) return
@@ -313,6 +334,7 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
           secondaryCity={secondaryCity}
           sunPrimary={sunPrimary}
           sunSecondary={sunSecondary}
+          planned={planned}
         />
       </section>
 

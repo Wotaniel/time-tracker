@@ -121,6 +121,13 @@ export interface TaskStat {
   apps: string[]
 }
 
+/** Запланированная встреча из календаря */
+export interface PlannedEvent {
+  title: string
+  start: string
+  end: string
+}
+
 /** Рабочее время за конкретный день — для целей и серий */
 export interface WorkDayStat {
   date: string
@@ -201,6 +208,7 @@ export const IPC_CHANNELS = {
   ACTIVITIES_GET_UNTAGGED: 'activities:getUntagged',
   MEETINGS_GET_DAY: 'meetings:getDay',
   MEETINGS_GET_RANGE: 'meetings:getRange',
+  CALENDAR_GET_DAY: 'calendar:getDay',
   CATEGORIES_GET_ALL: 'categories:getAll',
   CATEGORIES_UPSERT: 'categories:upsert',
   CATEGORIES_DELETE: 'categories:delete',
@@ -243,6 +251,14 @@ export interface TimeTrackerApi {
     getAfkTime: (date: string) => Promise<number>
     getDayCoverage: (date: string) => Promise<DayCoverage>
     getUntagged: (date: string) => Promise<UntaggedEntry[]>
+  }
+  calendar: {
+    /** Запланированные встречи; available=false — нет доступа к календарю */
+    getDay: (date: string) => Promise<{
+      available: boolean
+      reason?: 'permission' | 'timeout' | 'error'
+      events: PlannedEvent[]
+    }>
   }
   meetings: {
     getDay: (date: string) => Promise<Meeting[]>

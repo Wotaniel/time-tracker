@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ActivityEvent, Meeting, TagType } from '../../../shared/types'
+import type { ActivityEvent, Meeting, PlannedEvent, TagType } from '../../../shared/types'
 import { formatDuration, formatLocalDate, formatTimeSec } from '../lib/format'
 import { tagColor } from '../lib/tags'
 import { Moon, Sun } from 'lucide-react'
@@ -25,6 +25,8 @@ interface DayLaneProps {
   primaryCity?: City | null
   /** Рассвет и закат основного города — на нижней шкале */
   sunPrimary?: SunTimes | null
+  /** Запланированные встречи из календаря */
+  planned?: PlannedEvent[]
   /** Второй город: его шкала сверху и его солнце */
   secondaryCity?: City | null
   sunSecondary?: SunTimes | null
@@ -65,6 +67,7 @@ export function DayLane({
   tagFor,
   categoryFor,
   primaryCity = null,
+  planned = [],
   sunPrimary = null,
   secondaryCity = null,
   sunSecondary = null
@@ -124,6 +127,28 @@ export function DayLane({
                 ]
               : []),
             ...(category ? [`категория: ${category}`] : [])
+          ]
+        }
+      }
+    ]
+  })
+
+  // План из календаря: отдельная дорожка, чтобы не путать с фактическими созвонами
+  const plannedBars = planned.flatMap((event, index) => {
+    const from = new Date(event.start).getTime()
+    const to = new Date(event.end).getTime()
+    const geometry = place(from, to)
+    if (!geometry) return []
+    return [
+      {
+        key: `planned-${index}`,
+        ...geometry,
+        hoverInfo: {
+          leftPct: geometry.left + geometry.width / 2,
+          title: `Запланировано: ${event.title}`,
+          meta: [
+            `${formatTimeSec(event.start)}–${formatTimeSec(event.end)}`,
+            'из календаря, не фактическая активность'
           ]
         }
       }
@@ -396,6 +421,24 @@ export function DayLane({
           ))}
         </div>
 
+        {/* План из календаря */}
+        {plannedBars.length > 0 && (
+          <div className="relative mt-1 h-2 w-full overflow-hidden rounded-sm bg-tt-bg">
+            {plannedBars.map((bar) => (
+              <div
+                key={bar.key}
+                className="absolute inset-y-0 cursor-help rounded-sm border border-tt-border"
+                style={{
+                  left: `${bar.left}%`,
+                  width: `${bar.width}%`,
+                  backgroundColor: '#414868'
+                }}
+                {...hoverProps(bar.hoverInfo)}
+              />
+            ))}
+          </div>
+        )}
+
         {/* Созвоны */}
         <div className="relative mt-1 h-2 w-full overflow-hidden rounded-sm bg-tt-bg">
           {meetingBars.map((bar) => (
@@ -528,7 +571,8 @@ export function DayLane({
             ['отвлечение', METRIC.distracting],
             ['созвоны', METRIC.meeting],
             ['AFK', METRIC.afk],
-            ['не записано', METRIC.uncovered]
+            ['не записано', METRIC.uncovered],
+            ['план', '#414868']
           ] as const
         ).map(([label, color]) => (
           <span key={label} className="flex items-center gap-1">

@@ -10,6 +10,7 @@ export default function SettingsView(): JSX.Element {
   const [weekGoalHours, setWeekGoalHours] = useState(40)
   const [primaryCity, setPrimaryCity] = useState('moscow')
   const [secondaryCity, setSecondaryCity] = useState('')
+  const [calendarEnabled, setCalendarEnabled] = useState(false)
   const [excludedApps, setExcludedApps] = useState<string[]>([])
   const [newApp, setNewApp] = useState('')
   const [loading, setLoading] = useState(true)
@@ -23,8 +24,9 @@ export default function SettingsView(): JSX.Element {
       window.api.settings.get('dailyWorkGoal'),
       window.api.settings.get('weeklyWorkGoal'),
       window.api.settings.get('primaryCity'),
-      window.api.settings.get('secondaryCity')
-    ]).then(([auto, idle, excluded, goal, weekGoal, primary, secondary]) => {
+      window.api.settings.get('secondaryCity'),
+      window.api.settings.get('calendarEnabled')
+    ]).then(([auto, idle, excluded, goal, weekGoal, primary, secondary, calendar]) => {
       setAutostart(auto === true || auto === 'true')
       setIdleThreshold(typeof idle === 'number' ? idle : parseInt(String(idle ?? '60')) || 60)
       const goalMinutes = typeof goal === 'number' ? goal : parseInt(String(goal ?? '0')) || 0
@@ -34,6 +36,7 @@ export default function SettingsView(): JSX.Element {
       setWeekGoalHours(Math.round((weekGoalMinutes / 60) * 10) / 10)
       setPrimaryCity(String(primary ?? 'moscow') || 'moscow')
       setSecondaryCity(String(secondary ?? ''))
+      setCalendarEnabled(calendar === true || calendar === 'true')
       setExcludedApps(Array.isArray(excluded) ? excluded : [])
       setLoading(false)
     })
@@ -217,6 +220,9 @@ export default function SettingsView(): JSX.Element {
             <div className="text-xs text-tt-muted">
               Основной город — для рассвета и заката на нижней шкале. Второй город включает
               верхнюю шкалу со своим временем и своим солнцем. Пустое значение — одна шкала.
+              Встречи из Calendar.app добавляются полосой «план»; если её нет, разрешите
+              CarpeDiem доступ к календарю: Системные настройки → Конфиденциальность и
+              безопасность → Автоматизация → Calendar.
             </div>
             <div className="flex flex-wrap items-center gap-6">
               <label className="flex items-center gap-2 text-xs">
@@ -291,6 +297,33 @@ export default function SettingsView(): JSX.Element {
               />
               <span className="text-xs text-tt-muted">часов в день (норма)</span>
             </div>
+          </div>
+
+          {/* Calendar layer */}
+          <div className="space-y-3 rounded-lg border border-tt-border bg-tt-surface p-5">
+            <h3 className="flex items-center gap-2 text-sm font-medium">
+              <Clock size={16} className="text-tt-accent" />
+              Календарь
+            </h3>
+            <div className="text-xs text-tt-muted">
+              Встречи из Calendar.app полосой «план» на ленте дня. Выключено по умолчанию:
+              AppleScript к Calendar перебирает все события и на больших календарях не
+              укладывается даже в две минуты. Включайте, если готовы к задержке при первом
+              чтении; при первом запуске macOS спросит разрешение на автоматизацию.
+            </div>
+            <button
+              onClick={async () => {
+                const next = !calendarEnabled
+                setCalendarEnabled(next)
+                await window.api.settings.set('calendarEnabled', next)
+              }}
+              className="flex items-center gap-2 rounded-lg border border-tt-border px-3 py-1.5 text-sm hover:bg-tt-bg"
+            >
+              <span
+                className={`h-3 w-3 rounded-full ${calendarEnabled ? 'bg-tt-green' : 'bg-tt-border'}`}
+              />
+              {calendarEnabled ? 'включён' : 'выключен'}
+            </button>
           </div>
 
           {/* Exclusion list */}
