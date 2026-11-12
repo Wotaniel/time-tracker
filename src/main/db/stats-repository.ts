@@ -44,13 +44,19 @@ export class StatsRepository {
     const today = new Date()
     const fromDate = new Date(today)
     fromDate.setDate(fromDate.getDate() - (days - 1))
+
+    // Границы реального диапазона. Раньше fromDate вычислялся и не использовался:
+    // границы брались от сегодняшнего дня, поэтому при days > 1 в ответе был
+    // один заполненный день и нули вокруг.
+    const fromStr = formatLocalDate(fromDate)
     const toStr = formatLocalDate(today)
-    const { start, end } = localDayBounds(toStr)
+    const { start } = localDayBounds(fromStr)
+    const { end } = localDayBounds(toStr)
 
     // 1. Per-day totals (one query for all days)
     const totalRows = this.db
       .prepare(`
-        SELECT date(ts_start) AS day, COALESCE(SUM(duration), 0) AS totalActive
+        SELECT date(ts_start, 'localtime') AS day, COALESCE(SUM(duration), 0) AS totalActive
         FROM events
         WHERE ts_start >= ? AND ts_start <= ? AND is_afk = 0
         GROUP BY date(ts_start)
@@ -79,7 +85,10 @@ export class StatsRepository {
     // Group events by day + tag
     const tagByDay = new Map<string, Record<string, number>>()
     for (const e of eventRows) {
-      const day = e.ts_start.substring(0, 10)
+      // Локальная дата: ts_start хранится в UTC, а ключи дней строятся локально.
+      // Из-за прямого substring(0, 10) всё, что случилось до 03:00 по Москве,
+      // попадало в предыдущий день.
+      const day = formatLocalDate(new Date(e.ts_start))
       let dayMap = tagByDay.get(day)
       if (!dayMap) {
         dayMap = { work: 0, neutral: 0, distracting: 0, untagged: 0 }
