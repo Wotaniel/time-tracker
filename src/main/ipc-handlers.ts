@@ -74,6 +74,12 @@ export function registerIpcHandlers(
     return db.getMeetingsByDay(date)
   })
 
+  ipcMain.handle(IPC_CHANNELS.MEETINGS_GET_RANGE, (_event, from: string, to: string) => {
+    validateDate(from)
+    validateDate(to)
+    return db.getMeetingsByRange(from, to)
+  })
+
   // ─── Categories ───────────────────────────────────────────
 
   ipcMain.handle(IPC_CHANNELS.CATEGORIES_GET_ALL, () => {

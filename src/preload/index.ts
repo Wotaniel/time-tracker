@@ -26,7 +26,9 @@ const api = {
     getDayCoverage: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.ACTIVITIES_GET_DAY_COVERAGE, date)
   },
   meetings: {
-    getDay: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.MEETINGS_GET_DAY, date)
+    getDay: (date: string) => ipcRenderer.invoke(IPC_CHANNELS.MEETINGS_GET_DAY, date),
+    getRange: (from: string, to: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MEETINGS_GET_RANGE, from, to)
   },
   stats: {
     getDaily: (days: number) => ipcRenderer.invoke(IPC_CHANNELS.STATS_GET_DAILY, days),

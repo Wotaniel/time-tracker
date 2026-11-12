@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import type { CurrentActivity, TrackingHealthStatus } from '../../shared/types'
 import { TodayView } from './pages/TodayView'
-import StatsView from './pages/StatsView'
+import WeekView from './pages/WeekView'
 import SettingsView from './pages/SettingsView'
 
 // ─── Error Boundary ────────────────────────────────────────────
@@ -144,7 +144,7 @@ function AppInner(): JSX.Element {
         <div className="min-h-0 flex-1 overflow-y-auto p-6">
           {health && !health.tracking && <BlockedBanner health={health} />}
           {view === 'today' && <TodayView />}
-          {view === 'week' && <StatsView />}
+          {view === 'week' && <WeekView />}
           {view === 'settings' && <SettingsView />}
         </div>
       </main>

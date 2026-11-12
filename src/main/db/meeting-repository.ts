@@ -41,6 +41,20 @@ export class MeetingRepository {
     this.db.prepare('UPDATE meetings SET ts_end = ? WHERE id = ?').run(tsEnd, id)
   }
 
+  /** Созвоны, пересекающиеся с диапазоном дат (для недельной сводки) */
+  getMeetingsByRange(fromDate: string, toDate: string): Meeting[] {
+    const { start } = localDayBounds(fromDate)
+    const { end } = localDayBounds(toDate)
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM meetings
+         WHERE ts_start <= ? AND COALESCE(ts_end, ts_start) >= ?
+         ORDER BY ts_start ASC`
+      )
+      .all(end, start) as RawMeetingRow[]
+    return rows.map(rowToMeeting)
+  }
+
   /** Созвоны, начавшиеся в этот день */
   getMeetingsByDay(date: string): Meeting[] {
     const { start, end } = localDayBounds(date)

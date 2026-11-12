@@ -172,6 +172,7 @@ export const IPC_CHANNELS = {
   ACTIVITIES_GET_AFK_TIME: 'activities:getAfkTime',
   ACTIVITIES_GET_DAY_COVERAGE: 'activities:getDayCoverage',
   MEETINGS_GET_DAY: 'meetings:getDay',
+  MEETINGS_GET_RANGE: 'meetings:getRange',
   CATEGORIES_GET_ALL: 'categories:getAll',
   CATEGORIES_UPSERT: 'categories:upsert',
   CATEGORIES_DELETE: 'categories:delete',
@@ -214,6 +215,7 @@ export interface TimeTrackerApi {
   }
   meetings: {
     getDay: (date: string) => Promise<Meeting[]>
+    getRange: (from: string, to: string) => Promise<Meeting[]>
   }
   stats: {
     getDaily: (days: number) => Promise<DailyStat[]>
