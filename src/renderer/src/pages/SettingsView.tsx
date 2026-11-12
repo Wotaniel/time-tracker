@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
-import { Power, Clock, Download, ShieldOff, X, FileJson, SlidersHorizontal } from 'lucide-react'
+import { Power, Clock, Download, ShieldOff, X, FileJson, SlidersHorizontal, Globe } from 'lucide-react'
 import { RulesSection } from '../components/RulesSection'
+import { CITIES } from '../../../shared/cities'
 
 export default function SettingsView(): JSX.Element {
   const [autostart, setAutostart] = useState(false)
   const [idleThreshold, setIdleThreshold] = useState(600)
   const [workGoalHours, setWorkGoalHours] = useState(0)
   const [weekGoalHours, setWeekGoalHours] = useState(40)
-  const [lat, setLat] = useState('')
-  const [lon, setLon] = useState('')
+  const [primaryCity, setPrimaryCity] = useState('moscow')
+  const [secondaryCity, setSecondaryCity] = useState('')
   const [excludedApps, setExcludedApps] = useState<string[]>([])
   const [newApp, setNewApp] = useState('')
   const [loading, setLoading] = useState(true)
@@ -21,9 +22,9 @@ export default function SettingsView(): JSX.Element {
       window.api.settings.get('excludedApps'),
       window.api.settings.get('dailyWorkGoal'),
       window.api.settings.get('weeklyWorkGoal'),
-      window.api.settings.get('locationLat'),
-      window.api.settings.get('locationLon')
-    ]).then(([auto, idle, excluded, goal, weekGoal, savedLat, savedLon]) => {
+      window.api.settings.get('primaryCity'),
+      window.api.settings.get('secondaryCity')
+    ]).then(([auto, idle, excluded, goal, weekGoal, primary, secondary]) => {
       setAutostart(auto === true || auto === 'true')
       setIdleThreshold(typeof idle === 'number' ? idle : parseInt(String(idle ?? '60')) || 60)
       const goalMinutes = typeof goal === 'number' ? goal : parseInt(String(goal ?? '0')) || 0
@@ -31,8 +32,8 @@ export default function SettingsView(): JSX.Element {
       const weekGoalMinutes =
         typeof weekGoal === 'number' ? weekGoal : parseInt(String(weekGoal ?? '')) || 40 * 60
       setWeekGoalHours(Math.round((weekGoalMinutes / 60) * 10) / 10)
-      setLat(savedLat === undefined || savedLat === null ? '' : String(savedLat))
-      setLon(savedLon === undefined || savedLon === null ? '' : String(savedLon))
+      setPrimaryCity(String(primary ?? 'moscow') || 'moscow')
+      setSecondaryCity(String(secondary ?? ''))
       setExcludedApps(Array.isArray(excluded) ? excluded : [])
       setLoading(false)
     })
@@ -61,11 +62,11 @@ export default function SettingsView(): JSX.Element {
     await window.api.settings.set('weeklyWorkGoal', Math.round(safe * 60))
   }
 
-  const saveLocation = async (): Promise<void> => {
-    const latNum = parseFloat(lat.replace(',', '.'))
-    const lonNum = parseFloat(lon.replace(',', '.'))
-    await window.api.settings.set('locationLat', Number.isFinite(latNum) ? latNum : '')
-    await window.api.settings.set('locationLon', Number.isFinite(lonNum) ? lonNum : '')
+  const saveCities = async (primary: string, secondary: string): Promise<void> => {
+    setPrimaryCity(primary)
+    setSecondaryCity(secondary)
+    await window.api.settings.set('primaryCity', primary)
+    await window.api.settings.set('secondaryCity', secondary)
   }
 
   const saveExcludedApps = async (apps: string[]): Promise<void> => {
@@ -207,31 +208,46 @@ export default function SettingsView(): JSX.Element {
             <RulesSection />
           </div>
 
-          {/* Location for sunrise/sunset */}
+          {/* Cities and timezones */}
           <div className="space-y-3 rounded-lg border border-tt-border bg-tt-surface p-5">
             <h3 className="flex items-center gap-2 text-sm font-medium">
-              <Clock size={16} className="text-tt-accent" />
-              Место
+              <Globe size={16} className="text-tt-accent" />
+              Города и часовые пояса
             </h3>
             <div className="text-xs text-tt-muted">
-              Координаты для рассвета и заката на ленте дня. Считаются локально, сеть не
-              используется. Широта 55.75 и долгота 37.62 — Москва; пустые поля выключают засечки.
+              Основной город — для рассвета и заката на нижней шкале. Второй город включает
+              верхнюю шкалу со своим временем и своим солнцем. Пустое значение — одна шкала.
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                value={lat}
-                onChange={(e) => setLat(e.target.value)}
-                onBlur={() => void saveLocation()}
-                placeholder="широта, 55.75"
-                className="w-36 rounded-lg border border-tt-border bg-tt-bg px-3 py-1.5 text-sm text-tt-text placeholder-tt-muted focus:border-tt-accent focus:outline-none"
-              />
-              <input
-                value={lon}
-                onChange={(e) => setLon(e.target.value)}
-                onBlur={() => void saveLocation()}
-                placeholder="долгота, 37.62"
-                className="w-36 rounded-lg border border-tt-border bg-tt-bg px-3 py-1.5 text-sm text-tt-text placeholder-tt-muted focus:border-tt-accent focus:outline-none"
-              />
+            <div className="flex flex-wrap items-center gap-6">
+              <label className="flex items-center gap-2 text-xs">
+                <span className="text-tt-muted">основной</span>
+                <select
+                  value={primaryCity}
+                  onChange={(e) => void saveCities(e.target.value, secondaryCity)}
+                  className="rounded-lg border border-tt-border bg-tt-bg px-3 py-1.5 text-sm text-tt-text focus:border-tt-accent focus:outline-none"
+                >
+                  {CITIES.map((city) => (
+                    <option key={city.id} value={city.id}>
+                      {city.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-xs">
+                <span className="text-tt-muted">вторая шкала</span>
+                <select
+                  value={secondaryCity}
+                  onChange={(e) => void saveCities(primaryCity, e.target.value)}
+                  className="rounded-lg border border-tt-border bg-tt-bg px-3 py-1.5 text-sm text-tt-text focus:border-tt-accent focus:outline-none"
+                >
+                  <option value="">выключена</option>
+                  {CITIES.map((city) => (
+                    <option key={city.id} value={city.id}>
+                      {city.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
           </div>
 

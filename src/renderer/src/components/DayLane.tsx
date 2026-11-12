@@ -4,6 +4,7 @@ import { formatDuration, formatLocalDate, formatTimeSec } from '../lib/format'
 import { tagColor } from '../lib/tags'
 import { METRIC } from '../lib/colors'
 import type { SunTimes } from '../../../shared/sun'
+import type { City } from '../../../shared/cities'
 
 /**
  * Лента дня: три дорожки, масштаб и подробности.
@@ -19,8 +20,13 @@ interface DayLaneProps {
   date: string
   tagFor: (appName: string, url: string | null) => TagType | undefined
   categoryFor: (categoryId: number | null | undefined) => string | null
-  /** Рассвет и закат для выбранной даты; null — координаты не заданы */
-  sun?: SunTimes | null
+  /** Основной город — подпись и солнце на нижней шкале */
+  primaryCity?: City | null
+  /** Рассвет и закат основного города — на нижней шкале */
+  sunPrimary?: SunTimes | null
+  /** Второй город: его шкала сверху и его солнце */
+  secondaryCity?: City | null
+  sunSecondary?: SunTimes | null
 }
 
 interface HoverInfo {
@@ -57,7 +63,10 @@ export function DayLane({
   date,
   tagFor,
   categoryFor,
-  sun = null
+  primaryCity = null,
+  sunPrimary = null,
+  secondaryCity = null,
+  sunSecondary = null
 }: DayLaneProps): JSX.Element {
   const [hover, setHover] = useState<HoverInfo | null>(null)
   // Масштаб — доля суток: колесо мыши сужает окно вокруг курсора
@@ -189,6 +198,19 @@ export function DayLane({
     })
   }
 
+  // Часы второго пояса, поставленные на нашу шкалу: сдвиг между поясами
+  const systemOffsetMinutes = -new Date().getTimezoneOffset()
+  const secondaryHourMarks = secondaryCity
+    ? Array.from({ length: 24 }, (_, hour) => hour)
+        .map((hour) => {
+          const delta = secondaryCity.utcOffsetMinutes - systemOffsetMinutes
+          const systemMinutes = (((hour * 60 - delta) % 1440) + 1440) % 1440
+          const at = dayStart + systemMinutes * 60_000
+          return { hour, left: ((at - start) / viewMs) * 100 }
+        })
+        .filter((mark) => mark.left >= -2 && mark.left <= 102)
+    : []
+
   // Подпись на каждый час: 24 подписи помещаются на ширине ленты (проверено),
   // а при сильном приближении в окне остаётся один-два часа
   const hourStep = 1
@@ -290,6 +312,59 @@ export function DayLane({
       </div>
 
       <div className="relative" ref={laneRef}>
+        {/* Верхняя шкала — второй часовой пояс и его солнце */}
+        {secondaryCity && (
+          <div className="mb-1">
+            {/* Название города отдельной строкой: в строке чисел оно
+                наезжало на крайнюю подпись */}
+            <div className="text-right text-[9px] uppercase tracking-wide text-tt-muted opacity-80">
+              {secondaryCity.name}
+            </div>
+            <div className="relative h-1.5">
+              {secondaryHourMarks.map((mark) => (
+                <span
+                  key={`top-${mark.hour}`}
+                  className="absolute top-0 h-full w-px"
+                  style={{
+                    left: `${mark.left}%`,
+                    backgroundColor: mark.hour % 6 === 0 ? METRIC.afk : '#414868'
+                  }}
+                />
+              ))}
+            </div>
+            <div className="relative mt-0.5 h-3 text-[9px] leading-none text-tt-muted">
+              {secondaryHourMarks.map((mark) => (
+                <span
+                  key={`top-label-${mark.hour}`}
+                  className={mark.hour % 6 === 0 ? 'absolute font-semibold text-tt-text' : 'absolute'}
+                  style={{ left: `${mark.left}%`, transform: 'translateX(-50%)' }}
+                >
+                  {mark.hour}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Солнце второго города — засечки у верхней шкалы */}
+        {secondaryCity &&
+          sunSecondary &&
+          (
+            [
+              ['рассвет', sunSecondary.sunrise, METRIC.uncovered],
+              ['закат', sunSecondary.sunset, METRIC.distracting]
+            ] as const
+          ).map(([label, at, color]) =>
+            at !== null && at >= start && at <= end ? (
+              <div
+                key={`sun2-${label}`}
+                className="pointer-events-none absolute top-0 z-20 h-6 w-px opacity-60"
+                style={{ left: `${((at - start) / viewMs) * 100}%`, backgroundColor: color }}
+                title={`${label} (${secondaryCity.name}) — ${formatTimeSec(new Date(at).toISOString())}`}
+              />
+            ) : null
+          )}
+
         {/* Активность — главная дорожка */}
         <div className="relative h-16 w-full overflow-hidden rounded bg-tt-bg">
           {activityBars.map((bar) => (
@@ -406,12 +481,12 @@ export function DayLane({
           })}
         </div>
 
-        {/* Рассвет и закат: вертикальные засечки с подписью в шкале */}
-        {sun &&
+        {/* Рассвет и закат основного города */}
+        {sunPrimary &&
           (
             [
-              ['рассвет', sun.sunrise, METRIC.uncovered],
-              ['закат', sun.sunset, METRIC.distracting]
+              ['рассвет', sunPrimary.sunrise, METRIC.uncovered],
+              ['закат', sunPrimary.sunset, METRIC.distracting]
             ] as const
           ).map(([label, at, color]) =>
             at !== null && at >= start && at <= end ? (
@@ -423,7 +498,9 @@ export function DayLane({
                   backgroundColor: color,
                   borderLeft: `1px dashed ${color}`
                 }}
-                title={`${label} — ${formatTimeSec(new Date(at).toISOString())}`}
+                title={`${label} (${primaryCity?.name ?? 'ваш город'}) — ${formatTimeSec(
+                  new Date(at).toISOString()
+                )}`}
               />
             ) : null
           )}

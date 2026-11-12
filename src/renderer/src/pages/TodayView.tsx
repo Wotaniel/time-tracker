@@ -19,6 +19,7 @@ import { METRIC } from '../lib/colors'
 import { extractDomain, groupByDomain, isBrowser } from '../lib/domains'
 import { mergeMeetings, meetingSeconds } from '../../../shared/meetings'
 import { sunTimes, type SunTimes } from '../../../shared/sun'
+import { findCity, type City } from '../../../shared/cities'
 import { DayLane } from '../components/DayLane'
 import { EventList } from '../components/EventList'
 
@@ -43,7 +44,8 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
   const [untagged, setUntagged] = useState<UntaggedEntry[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [goalSeconds, setGoalSeconds] = useState(0)
-  const [location, setLocation] = useState<{ lat: number; lon: number } | null>(null)
+  const [primaryCity, setPrimaryCity] = useState<City | null>(null)
+  const [secondaryCity, setSecondaryCity] = useState<City | null>(null)
   const { tags, setTag, deleteTag } = useAppTags()
 
   // Всё, что показывает день, обновляется вместе: раньше созвоны и покрытие
@@ -76,15 +78,13 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
       const minutes = typeof value === 'number' ? value : parseInt(String(value ?? '0')) || 0
       setGoalSeconds(minutes * 60)
     })
-    Promise.all([window.api.settings.get('locationLat'), window.api.settings.get('locationLon')]).then(
-      ([lat, lon]) => {
-        const latNum = typeof lat === 'number' ? lat : parseFloat(String(lat ?? ''))
-        const lonNum = typeof lon === 'number' ? lon : parseFloat(String(lon ?? ''))
-        if (Number.isFinite(latNum) && Number.isFinite(lonNum)) {
-          setLocation({ lat: latNum, lon: lonNum })
-        }
-      }
-    )
+    Promise.all([
+      window.api.settings.get('primaryCity'),
+      window.api.settings.get('secondaryCity')
+    ]).then(([primary, secondary]) => {
+      setPrimaryCity(findCity(String(primary ?? 'moscow')))
+      setSecondaryCity(findCity(String(secondary ?? '')))
+    })
   }, [])
 
   const categoryById = new Map(categories.map((c) => [c.id, c]))
@@ -119,8 +119,11 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
   // Перезапуск приложения рвал один звонок на два интервала — склеиваем соседние
   const mergedMeetings = mergeMeetings(meetings)
 
-  const sun: SunTimes | null = location
-    ? sunTimes(selectedDate, location.lat, location.lon)
+  const sunPrimary: SunTimes | null = primaryCity
+    ? sunTimes(selectedDate, primaryCity.lat, primaryCity.lon)
+    : null
+  const sunSecondary: SunTimes | null = secondaryCity
+    ? sunTimes(selectedDate, secondaryCity.lat, secondaryCity.lon)
     : null
 
   const totalActive = summary.reduce((sum, item) => sum + item.totalTime, 0)
@@ -214,7 +217,7 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
             <div className="w-full max-w-md pb-1">
               <div className="mb-1 flex items-baseline justify-between text-[11px] text-tt-muted">
                 <span>
-                  цель {formatDuration(goalSeconds)}
+                  работа к цели {formatDuration(goalSeconds)}
                   {workTime >= goalSeconds ? (
                     <span className="ml-2" style={{ color: METRIC.work }}>
                       выполнена
@@ -280,7 +283,10 @@ export function TodayView({ onOpenSettings }: { onOpenSettings?: () => void }): 
           date={selectedDate}
           tagFor={tagFor}
           categoryFor={categoryFor}
-          sun={sun}
+          primaryCity={primaryCity}
+          secondaryCity={secondaryCity}
+          sunPrimary={sunPrimary}
+          sunSecondary={sunSecondary}
         />
       </section>
 

@@ -404,8 +404,8 @@ const ALLOWED_SETTING_KEYS = new Set([
   'excludedApps',
   'idleThreshold',
   'dailyWorkGoal',
-  'locationLat',
-  'locationLon',
+  'primaryCity',
+  'secondaryCity',
   'weeklyWorkGoal',
 ])
 
