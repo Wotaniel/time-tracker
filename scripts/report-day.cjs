@@ -42,10 +42,20 @@ function dayBounds(date) {
   return { start: new Date(y, m - 1, d, 0, 0, 0, 0), end: new Date(y, m - 1, d, 23, 59, 59, 999) }
 }
 
+/**
+ * Домен как в интерфейсе: без www, но с портом у localhost и IP —
+ * иначе localhost:3001 и localhost:8501 сливаются в один.
+ */
 function domainOf(url) {
   if (!url) return null
   try {
-    return new URL(url).hostname.replace(/^www\./, '')
+    const u = new URL(url)
+    const host = u.hostname.replace(/^www\./, '')
+    if (!host) return null
+    if (host === 'localhost' || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+      return u.port ? `${host}:${u.port}` : host
+    }
+    return host
   } catch {
     const m = url.match(/(?:https?:\/\/)?(?:www\.)?([a-z0-9][a-z0-9.-]+\.[a-z]{2,})/i)
     return m ? m[1] : null
@@ -135,6 +145,7 @@ function collect(db, date) {
     .prepare(`
       SELECT e.url AS url, SUM(${clamped}) AS seconds
       FROM events e WHERE ${over} AND e.is_afk = 0 AND e.url IS NOT NULL AND e.url != ''
+      GROUP BY e.url
     `)
     .all({ start: start.toISOString(), end: end.toISOString() })
 
