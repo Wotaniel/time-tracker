@@ -14,7 +14,7 @@
  */
 
 import { app } from 'electron'
-import { createWriteStream, mkdirSync, existsSync } from 'fs'
+import { createWriteStream, mkdirSync, existsSync, renameSync, rmSync, statSync } from 'fs'
 import { join } from 'path'
 import type { WriteStream } from 'fs'
 
@@ -29,6 +29,25 @@ let initAttempted = false
  * Returns null if app isn't ready yet or if the file system is inaccessible.
  * Retries until app.isReady() — initAttempted resets on failure.
  */
+/**
+ * Предел размера лога. Без ротации файл растёт бесконечно: после одного
+ * инцидента с зависшим хелпером он весил 4 МБ и 52 тысячи строк, и читать
+ * его стало невозможно. Держим один предыдущий файл.
+ */
+const MAX_LOG_BYTES = 5 * 1024 * 1024
+
+/** Переименовывает переросший лог в main.log.1, заменяя старый */
+function rotateIfNeeded(logFile: string): void {
+  try {
+    if (statSync(logFile).size < MAX_LOG_BYTES) return
+    const previous = `${logFile}.1`
+    rmSync(previous, { force: true })
+    renameSync(logFile, previous)
+  } catch {
+    // файла нет или нет прав — просто пишем дальше
+  }
+}
+
 function getFileStream(): WriteStream | null {
   if (fileStream) return fileStream
   if (initAttempted) return null
@@ -44,6 +63,7 @@ function getFileStream(): WriteStream | null {
       mkdirSync(logsDir, { recursive: true })
     }
     const logFile = join(logsDir, 'main.log')
+    rotateIfNeeded(logFile)
     fileStream = createWriteStream(logFile, { flags: 'a' })
     fileStream.on('error', () => {
       fileStream = null
