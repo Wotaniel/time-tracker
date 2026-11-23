@@ -64,7 +64,7 @@ describe('buildPeriodReport', () => {
     expect(text).toContain('Неделя 2026-11-06 — 2026-11-12')
     expect(text).toContain('Активность 32ч 10м · работа 27ч 5м')
     expect(text).not.toContain('Цель')
-    expect(text).not.toContain('Где время')
+    expect(text).not.toContain('По приложениям')
     expect(text).not.toContain('Задачи')
   })
 

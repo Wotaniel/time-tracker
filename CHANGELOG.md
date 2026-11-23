@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **«Неделя» идёт по календарю, Пн–Вс** — экран показывал скользящие 7 дней до сегодня, поэтому «прошлая неделя» не совпадала с календарной и дельта считалась от произвольного окна. Теперь по умолчанию открывается текущая неделя (понедельник–воскресенье), стрелками ‹ › листаются предыдущие, вперёд за текущую не пускает. Дни на графике подписаны «Пн 17» вместо «11-17», а для диапазона добавлен канал `stats:getDailyRange` — `getDaily` умел только «N дней от сегодня»
+- **«Где время» стало «По приложениям»** — заголовок блока называет содержимое, а не задаёт вопрос. Так же называется блок в текстовом отчёте и в `report-day.cjs`
+
+### Changed
 - **`SDD.md` replaced by `docs/ARCHITECTURE.md`** — the old design doc described a different program: `tray.ts`, `pages/Timeline.tsx`, `hooks/useActivities`, 15 IPC channels where there are 34, a schema without `task_key`/`meetings`/`app_tags`. The new document is written from the code; references in `README.md`, `AGENTS.md` and `.github/copilot-instructions.md` point to it
 - **Personal agent config is out of the repository** — `.agents/` (37 files) and `skills-lock.json` moved to `.gitignore`; the files stay on disk for local use
 

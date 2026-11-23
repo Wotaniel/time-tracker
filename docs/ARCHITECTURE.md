@@ -85,14 +85,14 @@ React 18, TypeScript (strict), better-sqlite3, Vite + Tailwind. Около 6 900
 
 ## IPC
 
-34 канала, имена `domain:action`, единственный источник — `IPC_CHANNELS`
+35 каналов, имена `domain:action`, единственный источник — `IPC_CHANNELS`
 в `src/shared/types.ts`.
 
 | домен | каналы |
 |---|---|
 | tracking | `getCurrent`, `pause`, `resume` |
 | activities | `getDay`, `getRange`, `getSummary`, `getSummaryDetailed`, `getAfkTime`, `getDayCoverage`, `getUntagged` |
-| stats | `getDaily`, `getTopApps`, `getHeatmap`, `getTagStats`, `getWork`, `getTasks` |
+| stats | `getDaily`, `getDailyRange`, `getTopApps`, `getHeatmap`, `getTagStats`, `getWork`, `getTasks`, `getWorkByDay` |
 | meetings | `getDay`, `getRange` |
 | categories | `getAll`, `upsert`, `delete` |
 | rules | `getAll`, `upsert`, `delete`, `getUsage` |
@@ -112,7 +112,7 @@ React 18, TypeScript (strict), better-sqlite3, Vite + Tailwind. Около 6 900
 |---|---|
 | `App.tsx` | каркас: три раздела с подписями, шапка с текущей активностью, баннеры «почему не пишет» |
 | `pages/TodayView.tsx` | «Сегодня»: герой, лента, «без тега», приложения, задачи дня, события |
-| `pages/WeekView.tsx` | «Неделя»: 4 KPI с дельтой, бары по дням, топ приложений, heatmap |
+| `pages/WeekView.tsx` | «Неделя»: календарная неделя Пн–Вс с листанием назад, 4 KPI с дельтой, бары по дням, топ приложений, heatmap |
 | `pages/SettingsView.tsx` | настройки: autostart, порог AFK, экспорт, исключения, правила и категории |
 | `components/DayLane.tsx` | лента дня: три дорожки, масштаб колесом, тултипы, метка «сейчас» |
 | `components/EventList.tsx` | сырые события дня |
