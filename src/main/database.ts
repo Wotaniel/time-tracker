@@ -151,6 +151,7 @@ export class DatabaseManager {
 
   // StatsRepository
   getDailyStats(days: number): DailyStat[] { return this.stats.getDailyStats(days) }
+  getDailyStatsRange(fromDate: string, toDate: string): DailyStat[] { return this.stats.getDailyStatsRange(fromDate, toDate) }
   getTopApps(fromDate: string, toDate: string, limit?: number): DaySummary[] { return this.stats.getTopApps(fromDate, toDate, limit) }
   getHeatmap(fromDate: string, toDate: string): HeatmapCell[] { return this.stats.getHeatmap(fromDate, toDate) }
   getTagStats(fromDate: string, toDate: string): TagStat[] { return this.stats.getTagStats(fromDate, toDate) }

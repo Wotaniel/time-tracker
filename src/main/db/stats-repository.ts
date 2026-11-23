@@ -39,20 +39,26 @@ export class StatsRepository {
 
   /**
    * Возвращает статистику за N последних дней.
-   *
-   * Оптимизация: вместо 2 запросов на каждый день (2N total) делает
-   * 2 запроса за весь диапазон и группирует по дню в JS.
    */
   getDailyStats(days: number): DailyStat[] {
     const today = new Date()
     const fromDate = new Date(today)
     fromDate.setDate(fromDate.getDate() - (days - 1))
+    // Границы считаем от начала диапазона: раньше их брали от сегодня, и при
+    // days > 1 в ответе был один заполненный день и нули вокруг.
+    return this.getDailyStatsRange(formatLocalDate(fromDate), formatLocalDate(today))
+  }
 
-    // Границы реального диапазона. Раньше fromDate вычислялся и не использовался:
-    // границы брались от сегодняшнего дня, поэтому при days > 1 в ответе был
-    // один заполненный день и нули вокруг.
-    const fromStr = formatLocalDate(fromDate)
-    const toStr = formatLocalDate(today)
+  /**
+   * Статистика по дням за произвольный диапазон дат.
+   *
+   * Нужен экрану «Неделя»: календарная неделя начинается в понедельник,
+   * а getDailyStats умеет только «N последних дней от сегодня».
+   * Оптимизация: вместо 2 запросов на каждый день (2N total) делает
+   * 2 запроса за весь диапазон и группирует по дню в JS.
+   * Дни без событий отдаются нулями — так график по дням не рвётся.
+   */
+  getDailyStatsRange(fromStr: string, toStr: string): DailyStat[] {
     const { start } = localDayBounds(fromStr)
     const { end } = localDayBounds(toStr)
 
@@ -105,10 +111,10 @@ export class StatsRepository {
 
     // Build result for each day in range
     const result: DailyStat[] = []
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(today)
-      d.setDate(d.getDate() - i)
-      const dateStr = formatLocalDate(d)
+    const cursor = new Date(`${fromStr}T00:00:00`)
+    const last = new Date(`${toStr}T00:00:00`)
+    while (cursor <= last) {
+      const dateStr = formatLocalDate(cursor)
       const dayMap = tagByDay.get(dateStr) ?? { work: 0, neutral: 0, distracting: 0, untagged: 0 }
       result.push({
         date: dateStr,
@@ -120,6 +126,7 @@ export class StatsRepository {
           { tag: 'untagged', seconds: dayMap.untagged }
         ]
       })
+      cursor.setDate(cursor.getDate() + 1)
     }
     return result
   }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   Bar,
   BarChart,
@@ -27,14 +28,33 @@ import { mergeMeetings, meetingSeconds } from '../../../shared/meetings'
  * Другой состав, потому что другой вопрос: не «что было», а «как изменилось».
  * Четыре KPI с дельтой к прошлой неделе, распределение по дням и топ приложений.
  * Heatmap — отдельным переключателем, а не пятым блоком на первом плане.
+ *
+ * Неделя календарная, Пн–Вс: по умолчанию открывается текущая, стрелками
+ * можно листать предыдущие. Вперёд за текущую неделю не уходим.
  */
 
 type Tone = 'good' | 'bad' | 'neutral'
 
-function shiftDate(days: number): string {
-  const d = new Date()
+const WEEKDAY_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+
+/** Сдвиг даты на N дней; дата — локальная «YYYY-MM-DD» */
+function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00`)
   d.setDate(d.getDate() + days)
   return formatLocalDate(d)
+}
+
+/** Понедельник недели, в которую попадает дата (getDay: 0 — воскресенье) */
+function startOfWeek(date: string): string {
+  const d = new Date(`${date}T00:00:00`)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return formatLocalDate(d)
+}
+
+/** «Пн 17» — подпись дня на графике */
+function weekdayLabel(date: string): string {
+  const d = new Date(`${date}T00:00:00`)
+  return `${WEEKDAY_SHORT[(d.getDay() + 6) % 7]} ${Number(date.slice(8))}`
 }
 
 function sumMeetings(meetings: Meeting[]): number {
@@ -47,10 +67,16 @@ function tagSeconds(stats: TagStat[], tag: TagStat['tag']): number {
 }
 
 export default function WeekView(): JSX.Element {
-  const from = shiftDate(-6)
-  const prevFrom = shiftDate(-13)
-  const prevTo = shiftDate(-7)
+  const [weekOffset, setWeekOffset] = useState(0)
+
   const today = formatLocalDate(new Date())
+  // 0 — текущая неделя, -1 — прошлая и т.д.
+  const weekStart = addDays(startOfWeek(today), weekOffset * 7)
+  const weekEnd = addDays(weekStart, 6)
+  const prevFrom = addDays(weekStart, -7)
+  const prevTo = addDays(weekStart, -1)
+  // Серия считается по прошедшим дням: будущие дни текущей недели её бы рвали
+  const streakTo = weekEnd > today ? today : weekEnd
 
   const [daily, setDaily] = useState<DailyStat[]>([])
   const [tagCurrent, setTagCurrent] = useState<TagStat[]>([])
@@ -67,14 +93,15 @@ export default function WeekView(): JSX.Element {
 
   useEffect(() => {
     Promise.all([
-      window.api.stats.getDaily(14),
-      window.api.stats.getTagStats(from, today),
+      // Обе недели одним запросом: они идут подряд
+      window.api.stats.getDailyRange(prevFrom, weekEnd),
+      window.api.stats.getTagStats(weekStart, weekEnd),
       window.api.stats.getTagStats(prevFrom, prevTo),
-      window.api.stats.getTopApps(from, today, 10),
-      window.api.stats.getHeatmap(from, today),
-      window.api.meetings.getRange(from, today),
+      window.api.stats.getTopApps(weekStart, weekEnd, 10),
+      window.api.stats.getHeatmap(weekStart, weekEnd),
+      window.api.meetings.getRange(weekStart, weekEnd),
       window.api.meetings.getRange(prevFrom, prevTo),
-      window.api.stats.getWorkByDay(shiftDate(-29), today),
+      window.api.stats.getWorkByDay(addDays(weekStart, -29), streakTo),
       window.api.settings.get('dailyWorkGoal'),
       window.api.settings.get('weeklyWorkGoal')
     ]).then(([d, tc, tp, top, heat, mc, mp, wd, goal, weekGoal]) => {
@@ -92,10 +119,16 @@ export default function WeekView(): JSX.Element {
         typeof weekGoal === 'number' ? weekGoal : parseInt(String(weekGoal ?? '')) || WEEKLY_GOAL_HOURS * 60
       setWeekGoalSeconds(weekGoalMinutes * 60)
     })
-  }, [from, today, prevFrom, prevTo])
+  }, [weekStart, weekEnd, prevFrom, prevTo, streakTo])
 
-  const weekRows = useMemo(() => daily.filter((d) => d.date >= from), [daily, from])
-  const prevRows = useMemo(() => daily.filter((d) => d.date < from), [daily, from])
+  const weekRows = useMemo(
+    () => daily.filter((d) => d.date >= weekStart && d.date <= weekEnd),
+    [daily, weekStart, weekEnd]
+  )
+  const prevRows = useMemo(
+    () => daily.filter((d) => d.date >= prevFrom && d.date <= prevTo),
+    [daily, prevFrom, prevTo]
+  )
 
   const activeCurrent = weekRows.reduce((s, d) => s + d.totalActive, 0)
   const activePrev = prevRows.reduce((s, d) => s + d.totalActive, 0)
@@ -107,7 +140,7 @@ export default function WeekView(): JSX.Element {
   const meetingPrev = sumMeetings(meetPrev)
 
   const chartData = weekRows.map((row) => {
-    const label = row.date.slice(5)
+    const label = weekdayLabel(row.date)
     const byTag = (tag: string): number =>
       row.byTag.find((t) => t.tag === tag)?.seconds ?? 0
     return {
@@ -143,13 +176,38 @@ export default function WeekView(): JSX.Element {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-lg font-medium">Неделя</h1>
-          <p className="text-xs text-tt-muted">
-            {from} — {today} · сравнение с {prevFrom} — {prevTo}
-          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-tt-muted">
+            <button
+              onClick={() => setWeekOffset((offset) => offset - 1)}
+              className="no-drag rounded-md p-0.5 hover:bg-tt-surface hover:text-tt-text"
+              title="Предыдущая неделя"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <span className="tabular-nums text-tt-text">
+              {weekStart} — {weekEnd}
+            </span>
+            {weekOffset === 0 && (
+              <span className="rounded bg-tt-accent/25 px-2 py-0.5 text-[10px] font-medium text-tt-accent">
+                текущая
+              </span>
+            )}
+            <button
+              onClick={() => setWeekOffset((offset) => offset + 1)}
+              disabled={weekOffset >= 0}
+              className="no-drag rounded-md p-0.5 hover:bg-tt-surface hover:text-tt-text disabled:opacity-30"
+              title="Следующая неделя"
+            >
+              <ChevronRight size={14} />
+            </button>
+            <span>
+              · сравнение с {prevFrom} — {prevTo}
+            </span>
+          </div>
         </div>
         <button
           onClick={() => {
-            window.api.report.copyWeek(from, today).then(() => {
+            window.api.report.copyWeek(weekStart, weekEnd).then(() => {
               setCopied(true)
               setTimeout(() => setCopied(false), 2000)
             })
@@ -243,7 +301,7 @@ export default function WeekView(): JSX.Element {
           По дням
         </h2>
         {activeCurrent === 0 ? (
-          <div className="py-10 text-center text-sm text-tt-muted">За неделю данных нет.</div>
+          <div className="py-10 text-center text-sm text-tt-muted">За эту неделю данных нет.</div>
         ) : (
           <BarChart width={860} height={260} data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#414868" vertical={false} />
@@ -299,7 +357,7 @@ export default function WeekView(): JSX.Element {
       {/* Топ приложений */}
       <section className="rounded-lg border border-tt-border bg-tt-surface p-5">
         <h2 className="mb-4 text-xs font-medium uppercase tracking-wide text-tt-muted">
-          Где время
+          По приложениям
         </h2>
         {topApps.length === 0 ? (
           <div className="py-6 text-center text-sm text-tt-muted">Нет данных.</div>

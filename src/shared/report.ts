@@ -85,7 +85,7 @@ export function buildPeriodReport(input: PeriodReportInput): string {
   }
 
   if (input.topApps.length > 0) {
-    lines.push('Где время:')
+    lines.push('По приложениям:')
     for (const app of input.topApps) {
       lines.push(`• ${app.appName} — ${humanDuration(app.totalTime)}`)
     }

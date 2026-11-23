@@ -61,6 +61,31 @@ describe('getDailyStats', () => {
   })
 })
 
+describe('getDailyStatsRange', () => {
+  it('отдаёт дни запрошенного диапазона, включая будущие, с нулями', () => {
+    const db = createTestDb()
+    const events = new EventRepository(db)
+    const stats = new StatsRepository(db)
+
+    insertEvent(events, { tsStart: at(-9, 10), tsEnd: at(-9, 10, 10), duration: 600 })
+
+    // Ровно неделя Пн–Вс, которая целиком в прошлом
+    const rows = stats.getDailyStatsRange(dayOffset(-9), dayOffset(-3))
+    expect(rows.map((r) => r.date)).toEqual([
+      dayOffset(-9),
+      dayOffset(-8),
+      dayOffset(-7),
+      dayOffset(-6),
+      dayOffset(-5),
+      dayOffset(-4),
+      dayOffset(-3)
+    ])
+    expect(rows[0].totalActive).toBe(600)
+    expect(rows.slice(1).every((r) => r.totalActive === 0)).toBe(true)
+    db.close()
+  })
+})
+
 describe('getDayCoverage', () => {
   it('раскладывает день на активность, AFK и простои', () => {
     const db = createTestDb()

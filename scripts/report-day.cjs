@@ -279,7 +279,7 @@ function toMarkdown(report) {
   }
 
   if (report.apps.length > 0) {
-    lines.push('**Где время:**')
+    lines.push('**По приложениям:**')
     for (const a of report.apps.slice(0, 8)) {
       lines.push(`- ${a.app} — ${fmt(a.seconds)}`)
     }

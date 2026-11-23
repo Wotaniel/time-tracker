@@ -197,6 +197,7 @@ export const IPC_CHANNELS = {
   ACTIVITIES_GET_SUMMARY: 'activities:getSummary',
   ACTIVITIES_GET_SUMMARY_DETAILED: 'activities:getSummaryDetailed',
   STATS_GET_DAILY: 'stats:getDaily',
+  STATS_GET_DAILY_RANGE: 'stats:getDailyRange',
   STATS_GET_TOP_APPS: 'stats:getTopApps',
   STATS_GET_HEATMAP: 'stats:getHeatmap',
   STATS_GET_TAG_STATS: 'stats:getTagStats',
@@ -266,6 +267,8 @@ export interface TimeTrackerApi {
   }
   stats: {
     getDaily: (days: number) => Promise<DailyStat[]>
+    /** То же, но за произвольный диапазон дат — для календарной недели */
+    getDailyRange: (from: string, to: string) => Promise<DailyStat[]>
     getTopApps: (from: string, to: string, limit?: number) => Promise<DaySummary[]>
     getHeatmap: (from: string, to: string) => Promise<HeatmapCell[]>
     getTagStats: (from: string, to: string) => Promise<TagStat[]>

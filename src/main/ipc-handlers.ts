@@ -316,6 +316,12 @@ export function registerIpcHandlers(
     return db.getDailyStats(safeDays)
   })
 
+  ipcMain.handle(IPC_CHANNELS.STATS_GET_DAILY_RANGE, (_event, from: string, to: string) => {
+    validateDate(from)
+    validateDate(to)
+    return db.getDailyStatsRange(from, to)
+  })
+
   ipcMain.handle(
     IPC_CHANNELS.STATS_GET_TOP_APPS,
     (_event, from: string, to: string, limit?: number) => {
